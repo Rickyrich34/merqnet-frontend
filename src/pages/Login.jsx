@@ -16,9 +16,13 @@ export default function Login() {
 
   // ✅ IMPORTANT:
   // - In DEV: allow localhost fallback for local backend dev.
-  // - In PROD: DO NOT fallback. Force VITE_API_URL to be set in Vercel.
+  // - In PROD (Railway): DO NOT fallback. Force env var to be set.
   const API_BASE = useMemo(() => {
-    const fromEnv = import.meta.env.VITE_API_URL;
+    // Accept either env name to avoid breakage:
+    // - Preferred: VITE_API_URL
+    // - Legacy:    VITE_API_BASE_URL
+    const fromEnv =
+      import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
 
     if (fromEnv && typeof fromEnv === "string") return fromEnv.replace(/\/$/, "");
 
@@ -42,7 +46,7 @@ export default function Login() {
 
   const validate = () => {
     if (!API_BASE || !API_LOGIN_URL) {
-      return "Missing VITE_API_URL in production. Set it in Vercel → Project → Settings → Environment Variables.";
+      return "Missing VITE_API_URL in production. Set it in Railway → merqnet-frontend → Variables.";
     }
     if (!formData.email.trim()) return "Email is required.";
     if (!formData.password) return "Password is required.";
@@ -140,7 +144,9 @@ export default function Login() {
             {/* Helpful prod hint */}
             {!import.meta.env.DEV && !API_BASE && (
               <div className="mt-3 rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3 text-xs text-yellow-100">
-                <b>Config needed:</b> Set <code className="px-1">VITE_API_URL</code> in Vercel or login will try to hit localhost.
+                <b>Config needed:</b> Set{" "}
+                <code className="px-1">VITE_API_URL</code> in Railway (frontend
+                service variables) or login will try to hit localhost.
               </div>
             )}
           </div>

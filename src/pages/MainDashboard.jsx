@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import dog from "../assets/logopic2.png";
 
-const API = "http://localhost:5000";
+// ✅ FIX: use env in production, keep localhost fallback for local dev
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const MainDashboard = () => {
   const navigate = useNavigate();
@@ -116,11 +117,7 @@ const MainDashboard = () => {
 
       // ✅ FIX: support multiple backend shapes
       // common patterns: { user: {...} } OR { profile: {...} } OR direct user object
-      const u =
-        payload?.user ||
-        payload?.profile ||
-        payload?.data ||
-        payload;
+      const u = payload?.user || payload?.profile || payload?.data || payload;
 
       setUser(u && typeof u === "object" ? u : null);
     } catch (_) {}
@@ -314,8 +311,7 @@ const MainDashboard = () => {
     const src = Array.isArray(buyerReceiptsHistory) ? buyerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [buyerReceiptsHistory, pickReceiptDate]);
@@ -324,8 +320,7 @@ const MainDashboard = () => {
     const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [sellerReceiptsHistory, pickReceiptDate]);
@@ -381,20 +376,9 @@ const MainDashboard = () => {
       title: name,
       meta: `$${formatMoney(price)} • ${formatDate(when)}`,
       receiptLink:
-        lastBuy.receiptId
-          ? `/receipt/${lastBuy.receiptId}`
-          : lastBuy._id
-          ? `/receipt/${lastBuy._id}`
-          : null,
+        lastBuy.receiptId ? `/receipt/${lastBuy.receiptId}` : lastBuy._id ? `/receipt/${lastBuy._id}` : null,
     };
-  }, [
-    lastBuy,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
+  }, [lastBuy, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
 
   const lastSellText = useMemo(() => {
     if (!lastSell) return null;
@@ -406,20 +390,9 @@ const MainDashboard = () => {
       title: name,
       meta: `$${formatMoney(price)} • ${formatDate(when)}`,
       receiptLink:
-        lastSell.receiptId
-          ? `/receipt/${lastSell.receiptId}`
-          : lastSell._id
-          ? `/receipt/${lastSell._id}`
-          : null,
+        lastSell.receiptId ? `/receipt/${lastSell.receiptId}` : lastSell._id ? `/receipt/${lastSell._id}` : null,
     };
-  }, [
-    lastSell,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
+  }, [lastSell, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
 
   // ---------- UI ----------
   const Badge = ({ count }) => {
@@ -460,9 +433,7 @@ const MainDashboard = () => {
           className="hidden md:block absolute inset-0 m-auto w-28 opacity-60 pointer-events-none drop-shadow-[0_0_30px_rgba(255,0,255,0.85)]"
         />
 
-        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">
-          Activity Overview
-        </h2>
+        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">Activity Overview</h2>
 
         <div className="grid grid-cols-2 gap-6 w-full mb-10">
           <div className="pl-2">
@@ -472,9 +443,7 @@ const MainDashboard = () => {
             </p>
 
             <h3 className="text-lg mt-4 font-semibold text-purple-300">Buyer Messages</h3>
-            <p className="text-gray-400">
-              {buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}
-            </p>
+            <p className="text-gray-400">{buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}</p>
           </div>
 
           <div className="pr-2 text-right">
@@ -484,9 +453,7 @@ const MainDashboard = () => {
             </p>
 
             <h3 className="text-lg mt-4 font-semibold text-yellow-300">Seller Messages</h3>
-            <p className="text-gray-400">
-              {sellerUnread > 0 ? `${sellerUnread} unread` : "0 unread"}
-            </p>
+            <p className="text-gray-400">{sellerUnread > 0 ? `${sellerUnread} unread` : "0 unread"}</p>
           </div>
         </div>
 
@@ -552,9 +519,7 @@ const MainDashboard = () => {
               Based on {ratedSalesCount} rated sale{ratedSalesCount === 1 ? "" : "s"}
             </div>
 
-            <div className="text-xs text-gray-400 mt-2">
-              Build it. Keep it high. It favors decision making.
-            </div>
+            <div className="text-xs text-gray-400 mt-2">Build it. Keep it high. It favors decision making.</div>
           </div>
 
           <div className="rounded-xl p-6 border border-cyan-500/25 bg-black/25 shadow-[0_0_18px_rgba(0,220,255,0.18)]">
@@ -563,9 +528,7 @@ const MainDashboard = () => {
               <span className="font-semibold">Shipping Address</span>
             </div>
             <div className="text-lg font-semibold text-white">{addressLine}</div>
-            <div className="text-xs text-gray-400 mt-2">
-              {address?.streetAddress ? address.streetAddress : "—"}
-            </div>
+            <div className="text-xs text-gray-400 mt-2">{address?.streetAddress ? address.streetAddress : "—"}</div>
           </div>
 
           <div

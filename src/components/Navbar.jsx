@@ -1,3 +1,4 @@
+// src/components/Navbar.jsx
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import logopic2 from "../assets/logopic2.png";
@@ -19,6 +20,11 @@ const Navbar = () => {
 
   const getUserId = () => localStorage.getItem("userId") || "";
 
+  // ✅ confirms render on every route change
+  useEffect(() => {
+    console.log("NAVBAR RENDER ✅ path =", location.pathname);
+  }, [location.pathname]);
+
   useEffect(() => {
     const token = getToken();
     const userId = getUserId();
@@ -35,8 +41,7 @@ const Navbar = () => {
         return res.json();
       })
       .then((data) => {
-        const email =
-          data?.email || data?.user?.email || data?.profile?.email || "";
+        const email = data?.email || data?.user?.email || data?.profile?.email || "";
         if (email) {
           setUserEmail(email);
           localStorage.setItem("userEmail", email);
@@ -60,15 +65,11 @@ const Navbar = () => {
 
   return (
     <nav
-      className="
-        fixed top-0 left-0 right-0
-        z-[9999]
-        bg-[#070615]/90 backdrop-blur-md
-        border-b border-white/10
-      "
+      id="merqnet-navbar"
+      data-navbar="merqnet"
+      className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md border-b border-white/10"
     >
       <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
-        {/* LEFT */}
         <div className="flex items-center gap-3 min-w-0">
           <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-2">
             <img
@@ -88,7 +89,6 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* RIGHT */}
         <div className="flex items-center gap-4 sm:gap-8">
           {!isLoggedIn ? (
             <>

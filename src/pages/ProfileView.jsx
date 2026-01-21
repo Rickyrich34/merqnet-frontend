@@ -96,7 +96,6 @@ export default function ProfileView() {
           border border-purple-700
         "
       >
-        {/* HEADER */}
         <div className="flex flex-col items-start">
           <h1 className="text-3xl md:text-4xl font-bold mb-1 drop-shadow-[0_0_8px_#bb00ff]">
             {user.fullName}
@@ -146,7 +145,6 @@ export default function ProfileView() {
               ← Back to Dashboard
             </button>
 
-            {/* Settings -> Edit Profile */}
             <button
               onClick={() => navigate("/editprofile")}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 font-semibold hover:scale-105 transition-transform duration-200"

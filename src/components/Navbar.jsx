@@ -1,6 +1,7 @@
 // src/components/Navbar.jsx
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { Menu, X } from "lucide-react";
 import logopic2 from "../assets/logopic2.png";
 
 const Navbar = () => {
@@ -14,15 +15,16 @@ const Navbar = () => {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const getToken = () =>
     localStorage.getItem("userToken") || localStorage.getItem("token") || "";
 
   const getUserId = () => localStorage.getItem("userId") || "";
 
-  // ✅ confirms render on every route change
+  // Close mobile menu when route changes
   useEffect(() => {
-    console.log("NAVBAR RENDER ✅ path =", location.pathname);
+    setMobileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -57,11 +59,15 @@ const Navbar = () => {
     localStorage.removeItem("userEmail");
     setIsLoggedIn(false);
     setUserEmail("");
+    setMobileOpen(false);
     navigate("/login");
   };
 
-  const linkClass =
+  const linkBase =
     "text-white font-semibold text-sm sm:text-base drop-shadow-[0_0_6px_rgba(255,255,255,0.85)] hover:opacity-90 transition";
+
+  const mobileLink =
+    "w-full text-left px-4 py-3 rounded-xl hover:bg-white/5 transition text-white font-semibold";
 
   return (
     <nav
@@ -70,6 +76,7 @@ const Navbar = () => {
       className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md border-b border-white/10"
     >
       <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
+        {/* Left: Logo + Title + Email */}
         <div className="flex items-center gap-3 min-w-0">
           <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-2">
             <img
@@ -89,37 +96,38 @@ const Navbar = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-4 sm:gap-8">
+        {/* Desktop links */}
+        <div className="hidden sm:flex items-center gap-4 sm:gap-8">
           {!isLoggedIn ? (
             <>
               {location.pathname !== "/" && (
-                <Link to="/" className={linkClass}>
+                <Link to="/" className={linkBase}>
                   Home
                 </Link>
               )}
               {location.pathname !== "/login" && (
-                <Link to="/login" className={linkClass}>
-                  Iniciar sesión
+                <Link to="/login" className={linkBase}>
+                  Login
                 </Link>
               )}
               {location.pathname !== "/signup" && (
-                <Link to="/signup" className={linkClass}>
+                <Link to="/signup" className={linkBase}>
                   Signup
                 </Link>
               )}
             </>
           ) : (
             <>
-              <Link to="/dashboard" className={linkClass}>
+              <Link to="/dashboard" className={linkBase}>
                 Dashboard
               </Link>
-              <Link to="/messages" className={linkClass}>
+              <Link to="/messages" className={linkBase}>
                 Messages
               </Link>
-              <Link to="/history" className={linkClass}>
+              <Link to="/history" className={linkBase}>
                 History
               </Link>
-              <Link to="/profile" className={linkClass}>
+              <Link to="/profile" className={linkBase}>
                 Profile
               </Link>
 
@@ -127,12 +135,73 @@ const Navbar = () => {
                 onClick={handleLogout}
                 className="text-red-300 font-semibold text-sm sm:text-base drop-shadow-[0_0_6px_rgba(255,120,120,0.9)] hover:opacity-90 transition"
               >
-                Cerrar sesión
+                Logout
               </button>
             </>
           )}
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          className="sm:hidden inline-flex items-center justify-center rounded-xl p-2 border border-white/10 bg-white/5 hover:bg-white/10 transition"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          {mobileOpen ? (
+            <X className="text-white" size={22} />
+          ) : (
+            <Menu className="text-white" size={22} />
+          )}
+        </button>
       </div>
+
+      {/* Mobile dropdown panel */}
+      {mobileOpen && (
+        <div className="sm:hidden px-3 pb-4">
+          <div className="rounded-2xl border border-white/10 bg-[#060417]/95 backdrop-blur-md shadow-[0_0_25px_rgba(160,90,255,0.25)] overflow-hidden">
+            {!isLoggedIn ? (
+              <div className="flex flex-col">
+                {location.pathname !== "/" && (
+                  <Link to="/" className={mobileLink}>
+                    Home
+                  </Link>
+                )}
+                {location.pathname !== "/login" && (
+                  <Link to="/login" className={mobileLink}>
+                    Login
+                  </Link>
+                )}
+                {location.pathname !== "/signup" && (
+                  <Link to="/signup" className={mobileLink}>
+                    Signup
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <Link to="/dashboard" className={mobileLink}>
+                  Dashboard
+                </Link>
+                <Link to="/messages" className={mobileLink}>
+                  Messages
+                </Link>
+                <Link to="/history" className={mobileLink}>
+                  History
+                </Link>
+                <Link to="/profile" className={mobileLink}>
+                  Profile
+                </Link>
+
+                <button onClick={handleLogout} className={`${mobileLink} text-red-300`}>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

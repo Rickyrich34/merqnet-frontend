@@ -9,7 +9,7 @@ function Messages() {
   const navigate = useNavigate();
 
   const userId = localStorage.getItem("userId");
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("userToken") || localStorage.getItem("token");
 
   const [threads, setThreads] = useState([]);
   const [allMessages, setAllMessages] = useState([]); // optional: used for "View thread"

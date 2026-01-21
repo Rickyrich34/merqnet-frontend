@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
+
 export default function ProfileView() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ export default function ProfileView() {
     const fetchUser = async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/users/profile/${userId}`,
+          `${API}/api/users/profile/${userId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

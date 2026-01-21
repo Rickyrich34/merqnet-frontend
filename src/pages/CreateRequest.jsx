@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import logopic2 from "../assets/logopic2.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Canonical categories
 const CATEGORY_OPTIONS = [
@@ -46,8 +46,8 @@ function formatShipping(addr) {
   const country = addr.country || "";
   const postalCode = addr.postalCode || addr.zip || "";
 
-  const hasAny = [street, city, state, country, postalCode].some(
-    (v) => String(v || "").trim().length > 0
+  const hasAny = [street, city, state, country, postalCode].some((v) =>
+    String(v || "").trim().length > 0
   );
   if (!hasAny) return null;
 
@@ -315,9 +315,7 @@ export default function CreateRequest() {
               <div>Loading default shipping address...</div>
             ) : defaultShipText ? (
               <>
-                <div className="text-cyan-200">
-                  Default shipping address:
-                </div>
+                <div className="text-cyan-200">Default shipping address:</div>
                 <div className="mt-1 text-white/90 text-sm">
                   {defaultShipText}
                 </div>

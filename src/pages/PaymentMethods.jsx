@@ -23,7 +23,7 @@ import {
 
 // ✅ FIX: use Vercel/Vite env var, fallback to localhost
 const API = (() => {
-  const raw = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const raw = import.meta.env.VITE_API_URL;
   return String(raw).trim().replace(/\/+$/, "");
 })();
 

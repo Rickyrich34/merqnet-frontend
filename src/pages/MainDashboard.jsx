@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 import dog from "../assets/logopic2.png";
 
-// ✅ FIX: Never hardcode localhost in production builds.
-// Use VITE_API_URL (set in Railway frontend env), fallback to localhost for local dev.
+
 const API =
   (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
+console.log("API BASE =", import.meta.env.VITE_API_URL);
 
 const MainDashboard = () => {
   const navigate = useNavigate();

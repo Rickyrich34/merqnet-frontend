@@ -9,10 +9,18 @@ const InactivityLogout = ({ timeout }) => {
 
     const resetTimer = () => {
       clearTimeout(timer);
+
       timer = setTimeout(() => {
-        const token = localStorage.getItem("token"); // ✔ CORREGIDO
+        const token =
+          localStorage.getItem("userToken") || localStorage.getItem("token");
+
         if (!token) {
-          localStorage.clear();
+          // ❗ No borres TODO el storage
+          localStorage.removeItem("token");
+          localStorage.removeItem("userToken");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("userEmail");
+
           navigate("/login");
         }
       }, timeout);

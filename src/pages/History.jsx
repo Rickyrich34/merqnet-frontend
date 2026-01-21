@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ChevronLeft } from "lucide-react";
 
-const API = "import.meta.env.VITE_API_URL";
+const API = (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
 
 function pickFirst(...vals) {
   for (const v of vals) {
@@ -17,8 +17,8 @@ const History = () => {
 
   const userId = localStorage.getItem("userId");
   const token = pickFirst(
-    localStorage.getItem("token"),
-    localStorage.getItem("userToken")
+    localStorage.getItem("userToken"),
+    localStorage.getItem("token")
   );
 
   const [buyerHistory, setBuyerHistory] = useState([]);

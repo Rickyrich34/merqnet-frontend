@@ -46,7 +46,7 @@ export default function ProfileView() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-black">
-        Loading profile...
+        Loading profile.
       </div>
     );
   }
@@ -146,9 +146,9 @@ export default function ProfileView() {
               ← Back to Dashboard
             </button>
 
-            {/* FIX: Settings should go to /settings */}
+            {/* Settings -> Edit Profile */}
             <button
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate("/editprofile")}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 font-semibold hover:scale-105 transition-transform duration-200"
             >
               Settings

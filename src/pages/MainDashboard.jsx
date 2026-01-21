@@ -1,629 +1,154 @@
 // src/pages/MainDashboard.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  ReceiptText,
+  Mail,
+  Sparkles,
+  Zap,
   ShoppingCart,
-  Tag,
-  History as HistoryIcon,
-  MessageSquare,
-  Star,
-  MapPin,
+  Store,
+  ChevronRight,
 } from "lucide-react";
-import dog from "../assets/logopic2.png";
 
-
-const API =
-  (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
-console.log("API BASE =", import.meta.env.VITE_API_URL);
-
-const MainDashboard = () => {
+export default function MainDashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const userId = localStorage.getItem("userId");
-  const token = localStorage.getItem("userToken") || localStorage.getItem("token");
-
-  // 🔔 UNVIEWED (for badges / Activity Overview)
-  const [buyerReceiptsUnviewed, setBuyerReceiptsUnviewed] = useState([]);
-  const [sellerReceiptsUnviewed, setSellerReceiptsUnviewed] = useState([]);
-
-  // 📜 HISTORY (for Last Buy / Last Sell / Rating)
-  const [buyerReceiptsHistory, setBuyerReceiptsHistory] = useState([]);
-  const [sellerReceiptsHistory, setSellerReceiptsHistory] = useState([]);
-
-  const [buyerUnread, setBuyerUnread] = useState(0);
-  const [sellerUnread, setSellerUnread] = useState(0);
-
-  const [user, setUser] = useState(null);
-
-  // ---------- HELPERS ----------
-  const getId = useCallback((val) => {
-    if (val && typeof val === "object") return val._id;
-    return val;
-  }, []);
-
-  const authHeaders = useMemo(() => {
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  }, [token]);
-
-  const safeToNumber = useCallback((n) => {
-    const x = Number(n);
-    return Number.isFinite(x) ? x : 0;
-  }, []);
-
-  const formatMoney = useCallback(
-    (n) => {
-      const num = safeToNumber(n);
-      return num.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    },
-    [safeToNumber]
-  );
-
-  const formatDate = useCallback((d) => {
-    if (!d) return "—";
-    const dt = new Date(d);
-    if (Number.isNaN(dt.getTime())) return "—";
-    return dt.toLocaleString();
-  }, []);
-
-  const resolveReceiptProductName = useCallback((r) => {
-    if (!r) return "";
-    if (r.productName) return r.productName;
-
-    if (r.requestId && typeof r.requestId === "object") {
-      if (r.requestId.productName) return r.requestId.productName;
-    }
-
-    if (r.request && typeof r.request === "object") {
-      if (r.request.productName) return r.request.productName;
-    }
-
-    return "";
-  }, []);
-
-  const resolveReceiptPrice = useCallback(
-    (r) => {
-      if (!r) return 0;
-      const amt = safeToNumber(r.amount);
-      if (amt > 0) return amt;
-
-      const v =
-        r.finalPrice ?? r.wholeLotPrice ?? r.totalPrice ?? r.unitPrice ?? r.price;
-
-      return safeToNumber(v);
-    },
-    [safeToNumber]
-  );
-
-  const normalizeReceiptsPayload = useCallback((data) => {
-    const receipts = Array.isArray(data) ? data : data?.receipts;
-    return Array.isArray(receipts) ? receipts : [];
-  }, []);
-
-  // ---------- FETCH USER ----------
-  const fetchUser = useCallback(async () => {
-    try {
-      if (!userId || !token) return;
-
-      const res = await fetch(`${API}/api/users/profile/${userId}`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-
-      const payload = await res.json();
-
-      // ✅ FIX: support multiple backend shapes
-      // common patterns: { user: {...} } OR { profile: {...} } OR direct user object
-      const u = payload?.user || payload?.profile || payload?.data || payload;
-
-      setUser(u && typeof u === "object" ? u : null);
-    } catch (_) {}
-  }, [userId, token, authHeaders]);
-
-  // ---------- FETCH RECEIPTS (UNVIEWED ONLY) ----------
-  const fetchBuyerReceiptsUnviewed = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      const res = await fetch(`${API}/api/receipts/buyer?unviewed=true`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-      const data = await res.json();
-      setBuyerReceiptsUnviewed(normalizeReceiptsPayload(data));
-    } catch (_) {}
-  }, [token, authHeaders, normalizeReceiptsPayload]);
-
-  const fetchSellerReceiptsUnviewed = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      const res = await fetch(`${API}/api/receipts/seller?unviewed=true`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-      const data = await res.json();
-      setSellerReceiptsUnviewed(normalizeReceiptsPayload(data));
-    } catch (_) {}
-  }, [token, authHeaders, normalizeReceiptsPayload]);
-
-  // ---------- FETCH RECEIPTS (FULL HISTORY for Last Buy/Sell + Rating) ----------
-  const fetchBuyerReceiptsHistory = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      const res = await fetch(`${API}/api/receipts/buyer`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-      const data = await res.json();
-      setBuyerReceiptsHistory(normalizeReceiptsPayload(data));
-    } catch (_) {}
-  }, [token, authHeaders, normalizeReceiptsPayload]);
-
-  const fetchSellerReceiptsHistory = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      const res = await fetch(`${API}/api/receipts/seller`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-      const data = await res.json();
-      setSellerReceiptsHistory(normalizeReceiptsPayload(data));
-    } catch (_) {}
-  }, [token, authHeaders, normalizeReceiptsPayload]);
-
-  // ---------- FETCH MESSAGES (counts only) ----------
-  const fetchMessagesCounts = useCallback(async () => {
-    try {
-      if (!userId || !token) return;
-
-      const res = await fetch(`${API}/api/messages/user/${userId}`, {
-        headers: { ...authHeaders },
-      });
-
-      if (!res.ok) return;
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : [];
-
-      const receivedUnread = arr.filter(
-        (m) => String(getId(m.recipient)) === String(userId) && m.read === false
-      );
-
-      setBuyerUnread(
-        receivedUnread.filter((m) => String(getId(m.buyerId)) === String(userId)).length
-      );
-
-      setSellerUnread(
-        receivedUnread.filter((m) => String(getId(m.sellerId)) === String(userId)).length
-      );
-    } catch (_) {}
-  }, [userId, token, authHeaders, getId]);
-
-  // ---------- CLEAR MESSAGES ----------
-  const clearMessageUnread = useCallback(async () => {
-    try {
-      if (!userId || !token) return;
-
-      await fetch(`${API}/api/messages/mark-read/user/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/messages/markRead/user/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/messages/mark-all-read/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-
-      setBuyerUnread(0);
-      setSellerUnread(0);
-    } catch (_) {}
-  }, [userId, token, authHeaders]);
-
-  // ---------- CLEAR RECEIPT "NEW" ----------
-  const clearReceiptNew = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      await fetch(`${API}/api/receipts/mark-viewed/buyer`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/mark-viewed/seller`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/markViewed/buyer`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/markViewed/seller`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-
-      setBuyerReceiptsUnviewed((prev) => prev.map((r) => ({ ...r, viewedByBuyer: true })));
-      setSellerReceiptsUnviewed((prev) => prev.map((r) => ({ ...r, viewedBySeller: true })));
-
-      fetchBuyerReceiptsUnviewed();
-      fetchSellerReceiptsUnviewed();
-      fetchBuyerReceiptsHistory();
-      fetchSellerReceiptsHistory();
-    } catch (_) {}
-  }, [
-    token,
-    authHeaders,
-    fetchBuyerReceiptsUnviewed,
-    fetchSellerReceiptsUnviewed,
-    fetchBuyerReceiptsHistory,
-    fetchSellerReceiptsHistory,
-  ]);
-
-  // ---------- INIT / REFRESH ----------
-  useEffect(() => {
-    if (!userId) return;
-
-    fetchUser();
-    fetchBuyerReceiptsUnviewed();
-    fetchSellerReceiptsUnviewed();
-    fetchBuyerReceiptsHistory();
-    fetchSellerReceiptsHistory();
-    fetchMessagesCounts();
-  }, [
-    userId,
-    location.pathname,
-    fetchUser,
-    fetchBuyerReceiptsUnviewed,
-    fetchSellerReceiptsUnviewed,
-    fetchBuyerReceiptsHistory,
-    fetchSellerReceiptsHistory,
-    fetchMessagesCounts,
-  ]);
-
-  // ---------- DERIVED COUNTS (UNVIEWED) ----------
-  const buyerNewReceipts = useMemo(
-    () => buyerReceiptsUnviewed.filter((r) => r && r.viewedByBuyer === false),
-    [buyerReceiptsUnviewed]
-  );
-
-  const sellerNewReceipts = useMemo(
-    () => sellerReceiptsUnviewed.filter((r) => r && r.viewedBySeller === false),
-    [sellerReceiptsUnviewed]
-  );
-
-  const buyerNewCount = buyerNewReceipts.length;
-  const sellerNewCount = sellerNewReceipts.length;
-
-  const pickReceiptDate = useCallback((r) => r?.createdAt || r?.date || r?.updatedAt || 0, []);
-
-  const sortedBuyerHistory = useMemo(() => {
-    const src = Array.isArray(buyerReceiptsHistory) ? buyerReceiptsHistory : [];
-    const arr = [...src];
-    arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
-    );
-    return arr;
-  }, [buyerReceiptsHistory, pickReceiptDate]);
-
-  const sortedSellerHistory = useMemo(() => {
-    const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
-    const arr = [...src];
-    arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
-    );
-    return arr;
-  }, [sellerReceiptsHistory, pickReceiptDate]);
-
-  const lastBuy = sortedBuyerHistory[0] || null;
-  const lastSell = sortedSellerHistory[0] || null;
-
-  // ---------- ADDRESS (SAFE) ----------
-  const address = useMemo(() => {
-    const list = Array.isArray(user?.shippingAddresses) ? user.shippingAddresses : [];
-    return list.find((a) => a?.isDefault) || list[0] || null;
-  }, [user]);
-
-  const addressLine = useMemo(() => {
-    if (!address) return "No address set";
-    const city = address.city || "";
-    const state = address.state || "";
-    const country = address.country || "";
-    const postal = address.postalCode || "";
-    const parts = [city, state, country, postal].filter(Boolean);
-    return parts.length ? parts.join(" - ") : "Address saved";
-  }, [address]);
-
-  // ---------- RATING (FROM HISTORY) ----------
-  const rating = useMemo(() => {
-    const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
-    const rated = src
-      .filter((r) => r && r.rating && r.rating.value != null)
-      .map((r) => safeToNumber(r.rating.value))
-      .filter((n) => n >= 1 && n <= 10);
-
-    if (rated.length === 0) return 0;
-    const avg = rated.reduce((sum, n) => sum + n, 0) / rated.length;
-    return safeToNumber(avg);
-  }, [sellerReceiptsHistory, safeToNumber]);
-
-  const ratedSalesCount = useMemo(() => {
-    const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
-    return src
-      .filter((r) => r && r.rating && r.rating.value != null)
-      .map((r) => safeToNumber(r.rating.value))
-      .filter((n) => n >= 1 && n <= 10).length;
-  }, [sellerReceiptsHistory, safeToNumber]);
-
-  // ---------- LAST BUY/SELL TEXT ----------
-  const lastBuyText = useMemo(() => {
-    if (!lastBuy) return null;
-    const name = resolveReceiptProductName(lastBuy) || "Purchase";
-    const price = resolveReceiptPrice(lastBuy);
-    const when = pickReceiptDate(lastBuy);
-
-    return {
-      title: name,
-      meta: `$${formatMoney(price)} • ${formatDate(when)}`,
-      receiptLink:
-        lastBuy.receiptId
-          ? `/receipt/${lastBuy.receiptId}`
-          : lastBuy._id
-          ? `/receipt/${lastBuy._id}`
-          : null,
-    };
-  }, [
-    lastBuy,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
-
-  const lastSellText = useMemo(() => {
-    if (!lastSell) return null;
-    const name = resolveReceiptProductName(lastSell) || "Sale";
-    const price = resolveReceiptPrice(lastSell);
-    const when = pickReceiptDate(lastSell);
-
-    return {
-      title: name,
-      meta: `$${formatMoney(price)} • ${formatDate(when)}`,
-      receiptLink:
-        lastSell.receiptId
-          ? `/receipt/${lastSell.receiptId}`
-          : lastSell._id
-          ? `/receipt/${lastSell._id}`
-          : null,
-    };
-  }, [
-    lastSell,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
-
-  // ---------- UI ----------
-  const Badge = ({ count }) => {
-    if (!count || count <= 0) return null;
-    return (
-      <span className="absolute -top-2 -right-2 min-w-[22px] h-[22px] px-1 rounded-full bg-pink-500 text-white text-xs font-bold flex items-center justify-center shadow-[0_0_18px_rgba(255,0,200,0.75)] border border-pink-300">
-        {count > 99 ? "99+" : count}
-      </span>
-    );
-  };
-
-  const ActionButton = ({ label, icon: Icon, onClick, badgeCount, tintClass }) => {
-    return (
-      <button
-        onClick={onClick}
-        className={`relative w-full sm:w-[210px] px-7 py-4 rounded-full font-semibold text-white flex items-center justify-center gap-2
-          bg-gradient-to-r ${tintClass}
-          shadow-[0_0_22px_rgba(180,60,255,0.35)]
-          hover:brightness-110 active:scale-[0.99] transition`}
-      >
-        <Icon size={18} />
-        {label}
-        <Badge count={badgeCount} />
-      </button>
-    );
+  // Replace these with real data when ready (API / context / props)
+  const stats = {
+    receipts: 0,
+    messages: 0,
+    activeRequests: 3,
+    liveBids: 5,
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center pt-24 pb-64 px-4 bg-[#030014] text-white">
-      <h1 className="text-4xl sm:text-5xl font-bold text-purple-300 mb-10 drop-shadow-[0_0_25px_rgba(180,60,255,0.7)]">
-        MerqNet Main Dashboard
-      </h1>
+    <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
+      {/* Cosmic background */}
+      <div className="absolute inset-0">
+        {/* Deep gradient base */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-[#13001f] to-black" />
 
-      <div className="relative w-full max-w-3xl p-8 rounded-2xl bg-[#0A001F]/80 border border-purple-600/60 shadow-[0_0_35px_rgba(160,50,255,0.7)] overflow-hidden">
-        <img
-          src={dog}
-          alt="dog"
-          className="hidden md:block absolute inset-0 m-auto w-28 opacity-60 pointer-events-none drop-shadow-[0_0_30px_rgba(255,0,255,0.85)]"
-        />
+        {/* Nebula blobs */}
+        <div className="absolute -top-24 -left-24 h-80 w-80 rounded-full bg-fuchsia-600/20 blur-3xl" />
+        <div className="absolute top-40 -right-24 h-96 w-96 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="absolute bottom-[-120px] left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-indigo-600/15 blur-3xl" />
 
-        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">
-          Activity Overview
-        </h2>
+        {/* Star noise overlay */}
+        <div className="absolute inset-0 opacity-[0.22] mix-blend-screen pointer-events-none [background-image:radial-gradient(#ffffff55_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="absolute inset-0 opacity-[0.08] mix-blend-screen pointer-events-none [background-image:radial-gradient(#ffffff55_1px,transparent_1px)] [background-size:6px_6px]" />
 
-        <div className="grid grid-cols-2 gap-6 w-full mb-10">
-          <div className="pl-2">
-            <h3 className="text-lg font-semibold text-blue-300">Buyer Receipts</h3>
-            <p className="text-gray-400">
-              {buyerNewCount > 0 ? `${buyerNewCount} new receipts` : "No new receipts"}
-            </p>
-
-            <h3 className="text-lg mt-4 font-semibold text-purple-300">Buyer Messages</h3>
-            <p className="text-gray-400">
-              {buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}
-            </p>
-          </div>
-
-          <div className="pr-2 text-right">
-            <h3 className="text-lg font-semibold text-pink-300">Seller Receipts</h3>
-            <p className="text-gray-400">
-              {sellerNewCount > 0 ? `${sellerNewCount} new receipts` : "No new receipts"}
-            </p>
-
-            <h3 className="text-lg mt-4 font-semibold text-yellow-300">Seller Messages</h3>
-            <p className="text-gray-400">
-              {sellerUnread > 0 ? `${sellerUnread} unread` : "0 unread"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <ActionButton
-            label="Buyer"
-            icon={ShoppingCart}
-            onClick={() => navigate("/buyerdashboard")}
-            badgeCount={0}
-            tintClass="from-blue-500 to-blue-700"
-          />
-
-          <ActionButton
-            label="Seller"
-            icon={Tag}
-            onClick={() => navigate("/sellerdashboard")}
-            badgeCount={0}
-            tintClass="from-pink-500 to-pink-700"
-          />
-
-          <ActionButton
-            label="Messages"
-            icon={MessageSquare}
-            onClick={async () => {
-              await clearMessageUnread();
-              navigate("/messages");
-            }}
-            badgeCount={buyerUnread + sellerUnread}
-            tintClass="from-purple-500 to-purple-700"
-          />
-
-          <ActionButton
-            label="History"
-            icon={HistoryIcon}
-            onClick={async () => {
-              await clearReceiptNew();
-              navigate("/history");
-            }}
-            badgeCount={buyerNewCount + sellerNewCount}
-            tintClass="from-orange-500 to-orange-700"
-          />
-        </div>
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
       </div>
 
-      <div className="mt-10 w-full max-w-3xl rounded-2xl bg-[#050022]/80 border border-cyan-500/30 shadow-[0_0_30px_rgba(0,255,255,0.2)] p-8">
-        <h2 className="text-2xl font-bold text-cyan-200 text-center mb-8">User Snapshot</h2>
+      {/* Content */}
+      <div className="relative mx-auto max-w-[420px] px-5 pt-12 pb-10">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight">
+            <span className="bg-gradient-to-r from-fuchsia-300 via-violet-200 to-indigo-200 bg-clip-text text-transparent drop-shadow-[0_0_18px_rgba(199,76,255,0.45)]">
+              MerqNet
+            </span>{" "}
+            <span className="text-white/95 drop-shadow-[0_0_18px_rgba(199,76,255,0.35)]">
+              Dashboard
+            </span>
+          </h1>
+          <p className="mt-3 text-sm text-white/70">
+            Your command center for <span className="text-white/85">requests</span>,{" "}
+            <span className="text-white/85">bids</span>, and{" "}
+            <span className="text-white/85">messages</span>.
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Rating */}
-          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(170,70,255,0.15)]">
-            <div className="flex items-center gap-2 text-purple-200 font-semibold">
-              <Star size={16} />
-              <span>Your Seller Rating</span>
-            </div>
+        {/* Stats grid */}
+        <div className="mt-8 grid grid-cols-2 gap-4">
+          <StatCard
+            icon={<ReceiptText className="h-5 w-5" />}
+            label="Receipts"
+            value={stats.receipts}
+          />
+          <StatCard
+            icon={<Mail className="h-5 w-5" />}
+            label="Messages"
+            value={stats.messages}
+          />
+          <StatCard
+            icon={<Sparkles className="h-5 w-5" />}
+            label="Active Requests"
+            value={stats.activeRequests}
+          />
+          <StatCard
+            icon={<Zap className="h-5 w-5" />}
+            label="Live Bids"
+            value={stats.liveBids}
+          />
+        </div>
 
-            <div className="mt-3 text-4xl font-extrabold text-white">
-              {rating.toFixed(1)} <span className="text-gray-300 text-2xl">/ 10</span>
-            </div>
-
-            <div className="text-sm text-gray-400 mt-2">
-              Based on {ratedSalesCount} rated sales
-            </div>
-
-            <div className="text-xs text-gray-500 mt-2">
-              Build it. Keep it high. It favors decision making.
-            </div>
-          </div>
-
-          {/* Address */}
-          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(0,255,255,0.12)]">
-            <div className="flex items-center gap-2 text-cyan-200 font-semibold">
-              <MapPin size={16} />
-              <span>Shipping Address</span>
-            </div>
-
-            <div className="mt-3 text-white font-semibold">
-              {user?.name ? `${user.name}` : "—"}
-            </div>
-            <div className="text-sm text-gray-300 mt-1">{addressLine}</div>
-
-            <div className="text-xs text-gray-500 mt-2">
-              {address?.streetAddress ? address.streetAddress : "—"}
-            </div>
-          </div>
-
-          {/* Last Buy */}
-          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(0,255,120,0.10)]">
-            <div className="text-green-200 font-semibold">Last Buy</div>
-
-            {lastBuyText ? (
-              <>
-                <div className="mt-3 text-white font-semibold">{lastBuyText.title}</div>
-                <div className="text-sm text-gray-400 mt-1">{lastBuyText.meta}</div>
-
-                {lastBuyText.receiptLink ? (
-                  <button
-                    className="mt-4 text-sm text-green-300 hover:text-green-200 underline"
-                    onClick={() => navigate(lastBuyText.receiptLink)}
-                  >
-                    View receipt
-                  </button>
-                ) : null}
-              </>
-            ) : (
-              <div className="mt-3 text-sm text-gray-300">
-                You haven't purchased anything yet.
-              </div>
-            )}
-          </div>
-
-          {/* Last Sell */}
-          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(255,120,0,0.10)]">
-            <div className="text-pink-200 font-semibold">Last Sell</div>
-
-            {lastSellText ? (
-              <>
-                <div className="mt-3 text-white font-semibold">{lastSellText.title}</div>
-                <div className="text-sm text-gray-400 mt-1">{lastSellText.meta}</div>
-
-                {lastSellText.receiptLink ? (
-                  <button
-                    className="mt-4 text-sm text-pink-300 hover:text-pink-200 underline"
-                    onClick={() => navigate(lastSellText.receiptLink)}
-                  >
-                    View receipt
-                  </button>
-                ) : null}
-              </>
-            ) : (
-              <div className="mt-3 text-sm text-gray-300">
-                You haven't sold anything yet.
-              </div>
-            )}
-          </div>
+        {/* Action buttons */}
+        <div className="mt-8 space-y-4">
+          <ActionButton
+            title="Enter Buyer Mode"
+            subtitle="Create requests, compare bids, choose the winner."
+            icon={<ShoppingCart className="h-5 w-5" />}
+            onClick={() => navigate("/buyer")}
+          />
+          <ActionButton
+            title="Enter Seller Mode"
+            subtitle="Bid on requests, manage sales, receipts."
+            icon={<Store className="h-5 w-5" />}
+            onClick={() => navigate("/seller")}
+          />
         </div>
       </div>
     </div>
   );
-};
+}
 
-export default MainDashboard;
+function StatCard({ icon, label, value }) {
+  return (
+    <div className="relative rounded-2xl p-[1px]">
+      {/* Glow border */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-fuchsia-500/70 via-violet-500/70 to-indigo-500/70 blur-[10px] opacity-70" />
+      <div className="relative rounded-2xl border border-white/10 bg-[#0b0613]/70 backdrop-blur-md px-4 py-4 shadow-[0_0_18px_rgba(170,76,255,0.18)]">
+        <div className="flex items-center gap-2 text-white/85">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 shadow-[0_0_14px_rgba(180,90,255,0.20)]">
+            {icon}
+          </span>
+          <span className="text-sm font-semibold">{label}</span>
+        </div>
+
+        <div className="mt-3 text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_0_14px_rgba(199,76,255,0.25)]">
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ title, subtitle, icon, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative w-full rounded-2xl p-[1px] text-left transition-transform active:scale-[0.99]"
+    >
+      {/* Outer glow */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-fuchsia-500/80 via-violet-500/80 to-indigo-500/80 blur-[14px] opacity-75 transition-opacity group-hover:opacity-95" />
+      <div className="relative flex items-center gap-4 rounded-2xl border border-white/10 bg-gradient-to-b from-[#2a0a45]/70 via-[#160622]/70 to-[#0b0613]/70 px-5 py-5 backdrop-blur-md shadow-[0_0_22px_rgba(170,76,255,0.22)]">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/5 border border-white/10 shadow-[0_0_16px_rgba(180,90,255,0.28)]">
+          {icon}
+        </div>
+
+        <div className="flex-1">
+          <div className="text-lg font-extrabold tracking-tight text-white">
+            {title}
+          </div>
+          <div className="mt-1 text-xs text-white/70">{subtitle}</div>
+        </div>
+
+        <ChevronRight className="h-6 w-6 text-white/70 transition-transform group-hover:translate-x-0.5" />
+      </div>
+    </button>
+  );
+}

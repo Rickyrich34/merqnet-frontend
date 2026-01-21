@@ -1,338 +1,361 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL;
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+
+  const API_BASE =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    "https://merqnet-backend-production.up.railway.app";
+
+  const token =
+    localStorage.getItem("userToken") || localStorage.getItem("token");
   const userId = localStorage.getItem("userId");
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const [formData, setFormData] = useState({
-    fullName: "",
+  const [form, setForm] = useState({
+    name: "",
     email: "",
     phone: "",
-    acceptsInternationalTrade: false,
+    internationalTrading: false,
     shippingAddresses: [],
   });
 
-  const [editing, setEditing] = useState({
-    fullName: false,
-    email: false,
-    phone: false,
-  });
-
   useEffect(() => {
-    if (!token || !userId) return;
-
-    const fetchUser = async () => {
+    const fetchProfile = async () => {
       try {
-        const res = await axios.get(
-          `${API}/api/users/profile/${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        setError("");
 
-        const user = res.data;
+        if (!token || !userId) {
+          setLoading(false);
+          return;
+        }
 
-        setFormData({
-          fullName: user.fullName || "",
-          email: user.email || "",
-          phone: user.phone || "",
-          acceptsInternationalTrade: user.acceptsInternationalTrade || false,
-          shippingAddresses: user.shippingAddresses || [],
+        const res = await fetch(`${API_BASE}/api/users/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         });
 
-        setLoading(false);
-      } catch (error) {
-        console.error("Error cargando perfil:", error);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || "Failed to load profile");
+
+        setForm({
+          name: data?.name || "",
+          email: data?.email || "",
+          phone: data?.phone || "",
+          internationalTrading: !!data?.internationalTrading,
+          shippingAddresses: Array.isArray(data?.shippingAddresses)
+            ? data.shippingAddresses
+            : [],
+        });
+      } catch (e) {
+        console.error("EditProfile load error:", e);
+        setError(e.message || "Failed to load profile");
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchUser();
-  }, [token, userId]);
-
-  const toggleEdit = (field) => {
-    setEditing((prev) => ({ ...prev, [field]: !prev[field] }));
-  };
+    fetchProfile();
+  }, [API_BASE, token, userId]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
+
+    setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  const handleAddressChange = (id, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      shippingAddresses: prev.shippingAddresses.map((addr) =>
-        addr._id === id ? { ...addr, [field]: value } : addr
-      ),
-    }));
+  const updateAddress = (idx, key, value) => {
+    setForm((prev) => {
+      const copy = [...prev.shippingAddresses];
+      copy[idx] = { ...copy[idx], [key]: value };
+      return { ...prev, shippingAddresses: copy };
+    });
   };
 
   const addAddress = () => {
-    if (formData.shippingAddresses.length >= 3) return;
+    setForm((prev) => {
+      const current = Array.isArray(prev.shippingAddresses)
+        ? prev.shippingAddresses
+        : [];
+      if (current.length >= 3) return prev;
 
-    const newAddress = {
-      _id: `temp-${Date.now()}`,
-      streetAddress: "",
-      city: "",
-      state: "",
-      country: "",
-      postalCode: "",
-      isDefault: formData.shippingAddresses.length === 0,
-    };
-
-    setFormData((prev) => ({
-      ...prev,
-      shippingAddresses: [...prev.shippingAddresses, newAddress],
-    }));
-  };
-
-  const setDefaultAddress = (id) => {
-    setFormData((prev) => ({
-      ...prev,
-      shippingAddresses: prev.shippingAddresses.map((addr) => ({
-        ...addr,
-        isDefault: addr._id === id,
-      })),
-    }));
-  };
-
-  const handleSubmit = async () => {
-    try {
-      // 🔥 FIX ABSOLUTO DEL ERROR 500 🔥
-      const cleanAddresses = formData.shippingAddresses.map((addr) => {
-        const copy = { ...addr };
-        if (copy._id && copy._id.startsWith("temp-")) {
-          delete copy._id; // Mongo genera uno nuevo SIN CRASHEAR
-        }
-        return copy;
-      });
-
-      const cleanPayload = {
-        ...formData,
-        shippingAddresses: cleanAddresses,
+      const newOne = {
+        streetAddress: "",
+        city: "",
+        state: "",
+        country: "",
+        postalCode: "",
+        isDefault: current.length === 0,
       };
 
-      await axios.put(
-        `${API}/api/users/profile/${userId}`,
-        cleanPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      return { ...prev, shippingAddresses: [...current, newOne] };
+    });
+  };
+
+  const removeAddress = (idx) => {
+    setForm((prev) => {
+      const copy = [...prev.shippingAddresses];
+      copy.splice(idx, 1);
+
+      // ensure 1 default if any remain
+      if (copy.length > 0 && !copy.some((a) => a.isDefault)) {
+        copy[0].isDefault = true;
+      }
+
+      return { ...prev, shippingAddresses: copy };
+    });
+  };
+
+  const setDefaultAddress = (idx) => {
+    setForm((prev) => {
+      const copy = prev.shippingAddresses.map((a, i) => ({
+        ...a,
+        isDefault: i === idx,
+      }));
+      return { ...prev, shippingAddresses: copy };
+    });
+  };
+
+  const saveChanges = async () => {
+    try {
+      setSaving(true);
+      setError("");
+
+      if (!token || !userId) {
+        setError("Not logged in.");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Failed to save changes");
 
       navigate("/profile");
-    } catch (error) {
-      console.error("Error guardando cambios:", error);
+    } catch (e) {
+      console.error("EditProfile save error:", e);
+      setError(e.message || "Failed to save changes");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const renderField = (label, fieldName, type = "text") => (
-    <div className="mb-6">
-      <label className="text-purple-300 flex justify-between items-center mb-1">
-        {label}
-        <button
-          type="button"
-          onClick={() => toggleEdit(fieldName)}
-          className="text-sm bg-purple-700 px-3 py-1 rounded hover:bg-purple-600"
-        >
-          {editing[fieldName] ? "Listo" : "Editar"}
-        </button>
-      </label>
-      <input
-        type={type}
-        name={fieldName}
-        value={formData[fieldName]}
-        disabled={!editing[fieldName]}
-        onChange={handleChange}
-        className={`w-full p-3 rounded bg-black/40 border border-purple-700 ${
-          editing[fieldName]
-            ? "opacity-100"
-            : "opacity-60 cursor-not-allowed"
-        }`}
-      />
-    </div>
-  );
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white bg-black">
-        Cargando...
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-white/70">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!token || !userId) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="text-white/70">You are not logged in.</div>
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-screen pt-24 px-6 pb-40 text-white flex justify-center"
-      style={{
-        background:
-          "linear-gradient(135deg, #0a0122 0%, #120034 50%, #1a0060 100%)",
-      }}
-    >
-      <div className="max-w-2xl w-full bg-black/40 backdrop-blur-xl p-10 rounded-2xl shadow-[0_0_30px_#9900ff] border border-purple-700 relative">
+    <div className="min-h-screen bg-gradient-to-b from-[#0b0016] via-[#120027] to-black text-white">
+      <div className="max-w-3xl mx-auto px-4 py-10">
+        <div className="bg-white/5 border border-white/10 rounded-3xl shadow-2xl p-8 backdrop-blur-md">
+          <h1 className="text-3xl font-extrabold text-fuchsia-200">
+            Edit Profile
+          </h1>
 
-        <button
-          type="button"
-          onClick={() => navigate("/profile")}
-          className="absolute top-4 left-4 px-4 py-2 bg-purple-900/80 hover:bg-purple-700 text-white font-bold rounded-lg shadow-[0_0_12px_#ff00ff] transition"
-        >
-          ← Volver
-        </button>
+          {error && (
+            <div className="mt-4 bg-red-500/15 border border-red-500/40 text-red-200 rounded-xl p-3 text-sm">
+              {error}
+            </div>
+          )}
 
-        <h1 className="text-3xl font-bold text-center mb-8 text-purple-300 drop-shadow-[0_0_10px_#9d00ff]">
-          Editar Perfil
-        </h1>
-
-        {renderField("Nombre completo", "fullName")}
-        {renderField("Correo electrónico", "email", "email")}
-        {renderField("Teléfono (+ prefijo)", "phone")}
-
-        <div className="mt-6 mb-10">
-          <label className="flex items-center gap-3 text-purple-300">
-            <input
-              type="checkbox"
-              name="acceptsInternationalTrade"
-              checked={formData.acceptsInternationalTrade}
-              onChange={handleChange}
-            />
-            Disponible para intercambio internacional
-          </label>
-        </div>
-
-        <h2 className="text-2xl font-semibold text-purple-400 mb-3">
-          Direcciones de Envío
-        </h2>
-
-        {formData.shippingAddresses.map((addr) => (
-          <div
-            key={addr._id}
-            className="bg-purple-900/30 p-5 rounded-xl border border-purple-700 shadow-[0_0_15px_#7c00ff] mb-5"
-          >
-            <div className="mb-3">
-              <label className="text-purple-300">Calle</label>
+          <div className="mt-6 grid gap-4">
+            <div>
+              <label className="text-sm text-white/80">Name</label>
               <input
-                type="text"
-                className="w-full p-2 rounded bg-black/40 border border-purple-700"
-                value={addr.streetAddress}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "streetAddress", e.target.value)
-                }
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
               />
             </div>
 
-            <div className="mb-3">
-              <label className="text-purple-300">Ciudad / Pueblo</label>
+            <div>
+              <label className="text-sm text-white/80">Email</label>
               <input
-                type="text"
-                className="w-full p-2 rounded bg-black/40 border border-purple-700"
-                value={addr.city}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "city", e.target.value)
-                }
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
               />
             </div>
 
-            <div className="mb-3">
-              <label className="text-purple-300">Estado / Provincia</label>
+            <div>
+              <label className="text-sm text-white/80">
+                Phone (include country code)
+              </label>
               <input
-                type="text"
-                className="w-full p-2 rounded bg-black/40 border border-purple-700"
-                value={addr.state}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "state", e.target.value)
-                }
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                placeholder="+1 787..."
               />
             </div>
 
-            <div className="mb-3">
-              <label className="text-purple-300">País</label>
+            <div className="flex items-center gap-3">
               <input
-                type="text"
-                className="w-full p-2 rounded bg-black/40 border border-purple-700"
-                value={addr.country}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "country", e.target.value)
-                }
+                type="checkbox"
+                name="internationalTrading"
+                checked={form.internationalTrading}
+                onChange={handleChange}
+                className="h-4 w-4"
               />
+              <span className="text-white/80">
+                Available for international trading
+              </span>
             </div>
 
-            <div className="mb-3">
-              <label className="text-purple-300">Código Postal</label>
-              <input
-                type="text"
-                className="w-full p-2 rounded bg-black/40 border border-purple-700"
-                value={addr.postalCode}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "postalCode", e.target.value)
-                }
-              />
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-fuchsia-300">
+                  Shipping Addresses
+                </h2>
+                <button
+                  onClick={addAddress}
+                  className="px-4 py-2 rounded-xl bg-fuchsia-500/70 hover:bg-fuchsia-500 font-semibold"
+                >
+                  Add Address
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4">
+                {form.shippingAddresses.map((addr, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white/5 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-sm text-white/80">
+                        Address #{idx + 1}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setDefaultAddress(idx)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                            addr.isDefault
+                              ? "bg-emerald-500/70"
+                              : "bg-white/10 hover:bg-white/15"
+                          }`}
+                        >
+                          {addr.isDefault ? "Default" : "Set Default"}
+                        </button>
+
+                        <button
+                          onClick={() => removeAddress(idx)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/30 hover:bg-red-500/40"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3">
+                      <input
+                        value={addr.streetAddress || ""}
+                        onChange={(e) =>
+                          updateAddress(idx, "streetAddress", e.target.value)
+                        }
+                        placeholder="Street Address"
+                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                      />
+                      <input
+                        value={addr.city || ""}
+                        onChange={(e) =>
+                          updateAddress(idx, "city", e.target.value)
+                        }
+                        placeholder="City"
+                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                      />
+                      <input
+                        value={addr.state || ""}
+                        onChange={(e) =>
+                          updateAddress(idx, "state", e.target.value)
+                        }
+                        placeholder="State / Province"
+                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                      />
+                      <input
+                        value={addr.country || ""}
+                        onChange={(e) =>
+                          updateAddress(idx, "country", e.target.value)
+                        }
+                        placeholder="Country"
+                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                      />
+                      <input
+                        value={addr.postalCode || ""}
+                        onChange={(e) =>
+                          updateAddress(idx, "postalCode", e.target.value)
+                        }
+                        placeholder="Postal Code"
+                        className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-2 text-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {form.shippingAddresses.length === 0 && (
+                  <div className="text-white/70 text-sm">
+                    No addresses yet. Add one.
+                  </div>
+                )}
+              </div>
             </div>
 
-            <label className="flex items-center gap-2 mt-2 text-purple-300">
-              <input
-                type="radio"
-                checked={addr.isDefault}
-                onChange={() => setDefaultAddress(addr._id)}
-              />
-              Dirección Predeterminada
-            </label>
+            <div className="mt-6 flex gap-4">
+              <button
+                onClick={() => navigate("/profile")}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={saveChanges}
+                disabled={saving}
+                className="px-5 py-2.5 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-600 font-semibold disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+
+            <button
+              onClick={() => navigate("/changepassword")}
+              className="mt-3 text-left text-sm text-fuchsia-300 hover:text-fuchsia-200 underline"
+            >
+              Change Password
+            </button>
           </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={addAddress}
-          className="bg-purple-700 hover:bg-purple-600 transition px-5 py-2 rounded-lg text-white font-semibold mt-2 disabled:opacity-40"
-          disabled={formData.shippingAddresses.length >= 3}
-        >
-          Añadir Dirección
-        </button>
-
-        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">
-          Cambio de Contraseña
-        </h2>
-        <button
-          type="button"
-          onClick={() => navigate("/changepassword")}
-          className="bg-blue-700 hover:bg-blue-600 transition px-5 py-2 rounded-lg text-white font-semibold"
-        >
-          Cambiar Contraseña
-        </button>
-
-        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">
-          Métodos de Pago
-        </h2>
-        <button
-          type="button"
-          onClick={() => navigate("/payment-methods")}
-          className="bg-green-700 hover:bg-green-600 transition px-5 py-2 rounded-lg text-white font-semibold"
-        >
-          Gestionar Métodos de Pago
-        </button>
-
-        <div className="flex justify-end mt-10">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="px-6 py-3 rounded-lg font-bold text-white bg-red-700 shadow-[0_0_12px_#ff004c] hover:bg-red-600"
-          >
-            Guardar Cambios
-          </button>
         </div>
       </div>
     </div>

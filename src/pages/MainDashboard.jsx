@@ -11,8 +11,11 @@ import {
 } from "lucide-react";
 import dog from "../assets/logopic2.png";
 
-// ✅ FIX: use env in production, keep localhost fallback for local dev
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// ✅ FIX: Never hardcode localhost in production builds.
+// Use VITE_API_URL (set in Railway frontend env), fallback to localhost for local dev.
+const API =
+  (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "") ||
+  "http://localhost:5000";
 
 const MainDashboard = () => {
   const navigate = useNavigate();
@@ -311,7 +314,8 @@ const MainDashboard = () => {
     const src = Array.isArray(buyerReceiptsHistory) ? buyerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) =>
+        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [buyerReceiptsHistory, pickReceiptDate]);
@@ -320,7 +324,8 @@ const MainDashboard = () => {
     const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) =>
+        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [sellerReceiptsHistory, pickReceiptDate]);
@@ -376,9 +381,20 @@ const MainDashboard = () => {
       title: name,
       meta: `$${formatMoney(price)} • ${formatDate(when)}`,
       receiptLink:
-        lastBuy.receiptId ? `/receipt/${lastBuy.receiptId}` : lastBuy._id ? `/receipt/${lastBuy._id}` : null,
+        lastBuy.receiptId
+          ? `/receipt/${lastBuy.receiptId}`
+          : lastBuy._id
+          ? `/receipt/${lastBuy._id}`
+          : null,
     };
-  }, [lastBuy, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
+  }, [
+    lastBuy,
+    formatMoney,
+    formatDate,
+    resolveReceiptPrice,
+    resolveReceiptProductName,
+    pickReceiptDate,
+  ]);
 
   const lastSellText = useMemo(() => {
     if (!lastSell) return null;
@@ -390,9 +406,20 @@ const MainDashboard = () => {
       title: name,
       meta: `$${formatMoney(price)} • ${formatDate(when)}`,
       receiptLink:
-        lastSell.receiptId ? `/receipt/${lastSell.receiptId}` : lastSell._id ? `/receipt/${lastSell._id}` : null,
+        lastSell.receiptId
+          ? `/receipt/${lastSell.receiptId}`
+          : lastSell._id
+          ? `/receipt/${lastSell._id}`
+          : null,
     };
-  }, [lastSell, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
+  }, [
+    lastSell,
+    formatMoney,
+    formatDate,
+    resolveReceiptPrice,
+    resolveReceiptProductName,
+    pickReceiptDate,
+  ]);
 
   // ---------- UI ----------
   const Badge = ({ count }) => {
@@ -433,7 +460,9 @@ const MainDashboard = () => {
           className="hidden md:block absolute inset-0 m-auto w-28 opacity-60 pointer-events-none drop-shadow-[0_0_30px_rgba(255,0,255,0.85)]"
         />
 
-        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">Activity Overview</h2>
+        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">
+          Activity Overview
+        </h2>
 
         <div className="grid grid-cols-2 gap-6 w-full mb-10">
           <div className="pl-2">
@@ -443,7 +472,9 @@ const MainDashboard = () => {
             </p>
 
             <h3 className="text-lg mt-4 font-semibold text-purple-300">Buyer Messages</h3>
-            <p className="text-gray-400">{buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}</p>
+            <p className="text-gray-400">
+              {buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}
+            </p>
           </div>
 
           <div className="pr-2 text-right">
@@ -453,7 +484,9 @@ const MainDashboard = () => {
             </p>
 
             <h3 className="text-lg mt-4 font-semibold text-yellow-300">Seller Messages</h3>
-            <p className="text-gray-400">{sellerUnread > 0 ? `${sellerUnread} unread` : "0 unread"}</p>
+            <p className="text-gray-400">
+              {sellerUnread > 0 ? `${sellerUnread} unread` : "0 unread"}
+            </p>
           </div>
         </div>
 
@@ -493,79 +526,99 @@ const MainDashboard = () => {
               navigate("/history");
             }}
             badgeCount={buyerNewCount + sellerNewCount}
-            tintClass="from-orange-400 to-amber-600"
+            tintClass="from-orange-500 to-orange-700"
           />
         </div>
       </div>
 
-      {/* User Snapshot */}
-      <div className="relative w-full max-w-3xl mt-10 p-8 rounded-2xl bg-[#07001f]/80 border border-cyan-500/30 shadow-[0_0_40px_rgba(0,220,255,0.25)] overflow-hidden">
-        <h2 className="text-2xl font-bold text-cyan-200 text-center mb-7 drop-shadow-[0_0_14px_rgba(0,220,255,0.35)]">
-          User Snapshot
-        </h2>
+      <div className="mt-10 w-full max-w-3xl rounded-2xl bg-[#050022]/80 border border-cyan-500/30 shadow-[0_0_30px_rgba(0,255,255,0.2)] p-8">
+        <h2 className="text-2xl font-bold text-cyan-200 text-center mb-8">User Snapshot</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="rounded-xl p-6 border border-purple-500/30 bg-black/25 shadow-[0_0_18px_rgba(180,60,255,0.18)]">
-            <div className="flex items-center gap-2 text-purple-200 mb-3">
-              <Star size={18} />
-              <span className="font-semibold">Your Seller Rating</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Rating */}
+          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(170,70,255,0.15)]">
+            <div className="flex items-center gap-2 text-purple-200 font-semibold">
+              <Star size={16} />
+              <span>Your Seller Rating</span>
             </div>
 
-            <div className="text-4xl font-extrabold text-purple-100 drop-shadow-[0_0_12px_rgba(200,120,255,0.35)]">
-              {rating.toFixed(1)} / 10
+            <div className="mt-3 text-4xl font-extrabold text-white">
+              {rating.toFixed(1)} <span className="text-gray-300 text-2xl">/ 10</span>
             </div>
 
-            <div className="text-xs text-gray-400 mt-2">
-              Based on {ratedSalesCount} rated sale{ratedSalesCount === 1 ? "" : "s"}
+            <div className="text-sm text-gray-400 mt-2">
+              Based on {ratedSalesCount} rated sales
             </div>
 
-            <div className="text-xs text-gray-400 mt-2">Build it. Keep it high. It favors decision making.</div>
+            <div className="text-xs text-gray-500 mt-2">
+              Build it. Keep it high. It favors decision making.
+            </div>
           </div>
 
-          <div className="rounded-xl p-6 border border-cyan-500/25 bg-black/25 shadow-[0_0_18px_rgba(0,220,255,0.18)]">
-            <div className="flex items-center gap-2 text-cyan-200 mb-3">
-              <MapPin size={18} />
-              <span className="font-semibold">Shipping Address</span>
+          {/* Address */}
+          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(0,255,255,0.12)]">
+            <div className="flex items-center gap-2 text-cyan-200 font-semibold">
+              <MapPin size={16} />
+              <span>Shipping Address</span>
             </div>
-            <div className="text-lg font-semibold text-white">{addressLine}</div>
-            <div className="text-xs text-gray-400 mt-2">{address?.streetAddress ? address.streetAddress : "—"}</div>
+
+            <div className="mt-3 text-white font-semibold">
+              {user?.name ? `${user.name}` : "—"}
+            </div>
+            <div className="text-sm text-gray-300 mt-1">{addressLine}</div>
+
+            <div className="text-xs text-gray-500 mt-2">
+              {address?.streetAddress ? address.streetAddress : "—"}
+            </div>
           </div>
 
-          <div
-            className={`rounded-xl p-6 border border-green-500/25 bg-black/25 shadow-[0_0_18px_rgba(0,255,120,0.14)] ${
-              lastBuyText?.receiptLink ? "cursor-pointer hover:brightness-110 transition" : ""
-            }`}
-            onClick={() => {
-              if (lastBuyText?.receiptLink) navigate(lastBuyText.receiptLink);
-            }}
-          >
-            <div className="text-green-300 font-semibold mb-3">Last Buy</div>
+          {/* Last Buy */}
+          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(0,255,120,0.10)]">
+            <div className="text-green-200 font-semibold">Last Buy</div>
+
             {lastBuyText ? (
               <>
-                <div className="text-white font-bold text-lg">{lastBuyText.title}</div>
-                <div className="text-gray-300 text-sm mt-1">{lastBuyText.meta}</div>
+                <div className="mt-3 text-white font-semibold">{lastBuyText.title}</div>
+                <div className="text-sm text-gray-400 mt-1">{lastBuyText.meta}</div>
+
+                {lastBuyText.receiptLink ? (
+                  <button
+                    className="mt-4 text-sm text-green-300 hover:text-green-200 underline"
+                    onClick={() => navigate(lastBuyText.receiptLink)}
+                  >
+                    View receipt
+                  </button>
+                ) : null}
               </>
             ) : (
-              <div className="text-gray-200 font-semibold">You haven’t purchased anything yet.</div>
+              <div className="mt-3 text-sm text-gray-300">
+                You haven't purchased anything yet.
+              </div>
             )}
           </div>
 
-          <div
-            className={`rounded-xl p-6 border border-pink-500/25 bg-black/25 shadow-[0_0_18px_rgba(255,0,200,0.14)] ${
-              lastSellText?.receiptLink ? "cursor-pointer hover:brightness-110 transition" : ""
-            }`}
-            onClick={() => {
-              if (lastSellText?.receiptLink) navigate(lastSellText.receiptLink);
-            }}
-          >
-            <div className="text-pink-300 font-semibold mb-3">Last Sell</div>
+          {/* Last Sell */}
+          <div className="rounded-xl border border-white/10 bg-[#0A001F]/60 p-6 shadow-[0_0_25px_rgba(255,120,0,0.10)]">
+            <div className="text-pink-200 font-semibold">Last Sell</div>
+
             {lastSellText ? (
               <>
-                <div className="text-white font-bold text-lg">{lastSellText.title}</div>
-                <div className="text-gray-300 text-sm mt-1">{lastSellText.meta}</div>
+                <div className="mt-3 text-white font-semibold">{lastSellText.title}</div>
+                <div className="text-sm text-gray-400 mt-1">{lastSellText.meta}</div>
+
+                {lastSellText.receiptLink ? (
+                  <button
+                    className="mt-4 text-sm text-pink-300 hover:text-pink-200 underline"
+                    onClick={() => navigate(lastSellText.receiptLink)}
+                  >
+                    View receipt
+                  </button>
+                ) : null}
               </>
             ) : (
-              <div className="text-gray-200 font-semibold">You haven’t sold anything yet.</div>
+              <div className="mt-3 text-sm text-gray-300">
+                You haven't sold anything yet.
+              </div>
             )}
           </div>
         </div>

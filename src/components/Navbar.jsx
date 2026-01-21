@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import logopic2 from "../assets/logopic2.png";
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -11,13 +13,15 @@ const Navbar = () => {
   const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("token") || localStorage.getItem("userToken");
     const userId = localStorage.getItem("userId");
 
     setIsLoggedIn(!!token);
 
     if (token && userId) {
-      fetch(`http://localhost:5000/api/users/profile/${userId}`)
+      fetch(`${API}/api/users/profile/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data?.email) setUserEmail(data.email);
@@ -28,6 +32,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("userToken"); // ✅ important
     localStorage.removeItem("userId");
     setIsLoggedIn(false);
     navigate("/login");
@@ -66,7 +71,6 @@ const Navbar = () => {
 
           {isLoggedIn && (
             <>
-              {/* 🐶 PERRO GRANDE Y PEGADO A DASHBOARD */}
               <img
                 src={logopic2}
                 alt="MerqNet"

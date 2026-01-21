@@ -76,7 +76,7 @@ function App() {
         <Route path="/profile" element={<ProfileView />} />
         <Route path="/editprofile" element={<EditProfile />} />
 
-        {/* ✅ FIX: /settings DOES NOT EXIST AS A PAGE, SO MAP IT TO EditProfile */}
+        {/* FIX: map /settings to EditProfile */}
         <Route path="/settings" element={<EditProfile />} />
 
         <Route path="/changepassword" element={<ChangePassword />} />

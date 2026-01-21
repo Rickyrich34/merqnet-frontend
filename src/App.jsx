@@ -40,7 +40,7 @@ import Messages from "./pages/Messages";
 /* COMPONENTS */
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import InactivityLogout from "./components/InactivityLogout";
+import InactivityLogout from "./utils/InactivityLogout";
 
 function App() {
   return (

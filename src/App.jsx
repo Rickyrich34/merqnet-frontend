@@ -46,9 +46,7 @@ function App() {
   return (
     <Router>
       <InactivityLogout timeout={15 * 60 * 1000} />
-      <div style={{color:"lime",position:"fixed",top:0,left:0,zIndex:999999}}>
-  NAV TEST
-</div>
+      
 
       <Navbar />
 

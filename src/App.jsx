@@ -80,6 +80,8 @@ function App() {
         {/* PROFILE */}
         <Route path="/profile" element={<ProfileView />} />
         <Route path="/editprofile" element={<EditProfile />} />
+        {/* ✅ FIX ONLY: alias so Settings button works even if it goes to /settings */}
+        <Route path="/settings" element={<EditProfile />} />
         <Route path="/changepassword" element={<ChangePassword />} />
 
         {/* OTHER */}

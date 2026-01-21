@@ -32,7 +32,6 @@ export default function ProfileView() {
         const res = await axios.get(`${API}/api/users/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         setUser(res.data);
       } catch (error) {
         console.error("Error loading profile:", error);
@@ -103,7 +102,9 @@ export default function ProfileView() {
             {user.fullName}
           </h1>
           <p className="text-purple-300 text-base md:text-lg">{user.email}</p>
-          <p className="text-purple-300 text-base md:text-lg">Phone: {user.phone}</p>
+          <p className="text-purple-300 text-base md:text-lg">
+            Phone: {user.phone}
+          </p>
         </div>
 
         <div className="mt-10 border-t border-purple-700/40 pt-6">
@@ -157,4 +158,3 @@ export default function ProfileView() {
     </div>
   );
 }
-

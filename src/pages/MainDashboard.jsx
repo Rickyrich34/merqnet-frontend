@@ -1,18 +1,10 @@
 // src/pages/MainDashboard.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import {
-  ShoppingCart,
-  Tag,
-  History as HistoryIcon,
-  MessageSquare,
-  Star,
-  MapPin,
-} from "lucide-react";
+import { ShoppingCart, Tag, Star, MapPin } from "lucide-react";
 import dog from "../assets/logopic2.png";
 
-const API =
-  (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
+const API = (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
 console.log("API BASE =", import.meta.env.VITE_API_URL);
 
 const MainDashboard = () => {
@@ -207,68 +199,6 @@ const MainDashboard = () => {
     } catch (_) {}
   }, [userId, token, authHeaders, getId]);
 
-  // ---------- CLEAR MESSAGES ----------
-  const clearMessageUnread = useCallback(async () => {
-    try {
-      if (!userId || !token) return;
-
-      await fetch(`${API}/api/messages/mark-read/user/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/messages/markRead/user/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/messages/mark-all-read/${userId}`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-
-      setBuyerUnread(0);
-      setSellerUnread(0);
-    } catch (_) {}
-  }, [userId, token, authHeaders]);
-
-  // ---------- CLEAR RECEIPT "NEW" ----------
-  const clearReceiptNew = useCallback(async () => {
-    try {
-      if (!token) return;
-
-      await fetch(`${API}/api/receipts/mark-viewed/buyer`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/mark-viewed/seller`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/markViewed/buyer`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-      await fetch(`${API}/api/receipts/markViewed/seller`, {
-        method: "PUT",
-        headers: { ...authHeaders },
-      }).catch(() => {});
-
-      setBuyerReceiptsUnviewed((prev) => prev.map((r) => ({ ...r, viewedByBuyer: true })));
-      setSellerReceiptsUnviewed((prev) => prev.map((r) => ({ ...r, viewedBySeller: true })));
-
-      fetchBuyerReceiptsUnviewed();
-      fetchSellerReceiptsUnviewed();
-      fetchBuyerReceiptsHistory();
-      fetchSellerReceiptsHistory();
-    } catch (_) {}
-  }, [
-    token,
-    authHeaders,
-    fetchBuyerReceiptsUnviewed,
-    fetchSellerReceiptsUnviewed,
-    fetchBuyerReceiptsHistory,
-    fetchSellerReceiptsHistory,
-  ]);
-
   useEffect(() => {
     if (!userId) return;
 
@@ -308,8 +238,7 @@ const MainDashboard = () => {
     const src = Array.isArray(buyerReceiptsHistory) ? buyerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [buyerReceiptsHistory, pickReceiptDate]);
@@ -318,8 +247,7 @@ const MainDashboard = () => {
     const src = Array.isArray(sellerReceiptsHistory) ? sellerReceiptsHistory : [];
     const arr = [...src];
     arr.sort(
-      (a, b) =>
-        new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
+      (a, b) => new Date(pickReceiptDate(b)).getTime() - new Date(pickReceiptDate(a)).getTime()
     );
     return arr;
   }, [sellerReceiptsHistory, pickReceiptDate]);
@@ -378,14 +306,7 @@ const MainDashboard = () => {
           ? `/receipt/${lastBuy._id}`
           : null,
     };
-  }, [
-    lastBuy,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
+  }, [lastBuy, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
 
   const lastSellText = useMemo(() => {
     if (!lastSell) return null;
@@ -403,14 +324,7 @@ const MainDashboard = () => {
           ? `/receipt/${lastSell._id}`
           : null,
     };
-  }, [
-    lastSell,
-    formatMoney,
-    formatDate,
-    resolveReceiptPrice,
-    resolveReceiptProductName,
-    pickReceiptDate,
-  ]);
+  }, [lastSell, formatMoney, formatDate, resolveReceiptPrice, resolveReceiptProductName, pickReceiptDate]);
 
   const Badge = ({ count }) => {
     if (!count || count <= 0) return null;
@@ -425,12 +339,14 @@ const MainDashboard = () => {
     return (
       <button
         onClick={onClick}
-        className={`relative w-full sm:w-[210px] px-7 py-4 rounded-full font-semibold text-white flex items-center justify-center gap-2
+        className={`relative w-full sm:w-[220px] px-7 py-4 rounded-full font-semibold text-white flex items-center justify-center gap-2
           bg-gradient-to-r ${tintClass}
-          shadow-[0_0_22px_rgba(180,60,255,0.35)]
-          hover:brightness-110 active:scale-[0.99] transition`}
+          border border-white/10
+          shadow-[0_0_28px_rgba(180,60,255,0.35)]
+          hover:brightness-110 hover:shadow-[0_0_36px_rgba(160,90,255,0.55)]
+          active:scale-[0.99] transition`}
       >
-        <Icon size={18} />
+        <Icon size={18} className="drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" />
         {label}
         <Badge count={badgeCount} />
       </button>
@@ -439,19 +355,22 @@ const MainDashboard = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center pt-24 pb-64 px-4 bg-[#030014] text-white">
-
       {/* 🔥 NEW NEON TITLE (only change) */}
       <h1 className="text-center mb-10 leading-tight">
-        <span className="block text-[2.2rem] sm:text-[2.6rem] font-extrabold tracking-tight
+        <span
+          className="block text-[2.2rem] sm:text-[2.6rem] font-extrabold tracking-tight
           bg-gradient-to-r from-fuchsia-300 via-violet-200 to-indigo-200
           bg-clip-text text-transparent
-          drop-shadow-[0_0_14px_rgba(199,76,255,0.75)]">
+          drop-shadow-[0_0_14px_rgba(199,76,255,0.75)]"
+        >
           MerqNet
         </span>
 
-        <span className="block mt-1 text-[1.4rem] sm:text-[1.7rem] font-semibold tracking-wide
+        <span
+          className="block mt-1 text-[1.4rem] sm:text-[1.7rem] font-semibold tracking-wide
           text-violet-200
-          drop-shadow-[0_0_12px_rgba(160,90,255,0.65)]">
+          drop-shadow-[0_0_12px_rgba(160,90,255,0.65)]"
+        >
           Dashboard
         </span>
       </h1>
@@ -463,9 +382,7 @@ const MainDashboard = () => {
           className="hidden md:block absolute inset-0 m-auto w-28 opacity-60 pointer-events-none drop-shadow-[0_0_30px_rgba(255,0,255,0.85)]"
         />
 
-        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">
-          Activity Overview
-        </h2>
+        <h2 className="text-2xl font-bold text-purple-200 text-center mb-8">Activity Overview</h2>
 
         <div className="grid grid-cols-2 gap-6 w-full mb-10">
           <div className="pl-2">
@@ -475,9 +392,7 @@ const MainDashboard = () => {
             </p>
 
             <h3 className="text-lg mt-4 font-semibold text-purple-300">Buyer Messages</h3>
-            <p className="text-gray-400">
-              {buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}
-            </p>
+            <p className="text-gray-400">{buyerUnread > 0 ? `${buyerUnread} unread` : "0 unread"}</p>
           </div>
 
           <div className="pr-2 text-right">
@@ -493,13 +408,14 @@ const MainDashboard = () => {
           </div>
         </div>
 
+        {/* ✅ ONLY Buyer + Seller buttons now */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <ActionButton
             label="Buyer"
             icon={ShoppingCart}
             onClick={() => navigate("/buyerdashboard")}
             badgeCount={0}
-            tintClass="from-blue-500 to-blue-700"
+            tintClass="from-cyan-500 via-blue-600 to-indigo-700"
           />
 
           <ActionButton
@@ -507,29 +423,7 @@ const MainDashboard = () => {
             icon={Tag}
             onClick={() => navigate("/sellerdashboard")}
             badgeCount={0}
-            tintClass="from-pink-500 to-pink-700"
-          />
-
-          <ActionButton
-            label="Messages"
-            icon={MessageSquare}
-            onClick={async () => {
-              await clearMessageUnread();
-              navigate("/messages");
-            }}
-            badgeCount={buyerUnread + sellerUnread}
-            tintClass="from-purple-500 to-purple-700"
-          />
-
-          <ActionButton
-            label="History"
-            icon={HistoryIcon}
-            onClick={async () => {
-              await clearReceiptNew();
-              navigate("/history");
-            }}
-            badgeCount={buyerNewCount + sellerNewCount}
-            tintClass="from-orange-500 to-orange-700"
+            tintClass="from-fuchsia-500 via-pink-600 to-rose-700"
           />
         </div>
       </div>
@@ -548,9 +442,7 @@ const MainDashboard = () => {
               {rating.toFixed(1)} <span className="text-gray-300 text-2xl">/ 10</span>
             </div>
 
-            <div className="text-sm text-gray-400 mt-2">
-              Based on {ratedSalesCount} rated sales
-            </div>
+            <div className="text-sm text-gray-400 mt-2">Based on {ratedSalesCount} rated sales</div>
 
             <div className="text-xs text-gray-500 mt-2">
               Build it. Keep it high. It favors decision making.
@@ -563,9 +455,7 @@ const MainDashboard = () => {
               <span>Shipping Address</span>
             </div>
 
-            <div className="mt-3 text-white font-semibold">
-              {user?.name ? `${user.name}` : "—"}
-            </div>
+            <div className="mt-3 text-white font-semibold">{user?.name ? `${user.name}` : "—"}</div>
             <div className="text-sm text-gray-300 mt-1">{addressLine}</div>
 
             <div className="text-xs text-gray-500 mt-2">
@@ -591,9 +481,7 @@ const MainDashboard = () => {
                 ) : null}
               </>
             ) : (
-              <div className="mt-3 text-sm text-gray-300">
-                You haven't purchased anything yet.
-              </div>
+              <div className="mt-3 text-sm text-gray-300">You haven't purchased anything yet.</div>
             )}
           </div>
 
@@ -615,9 +503,7 @@ const MainDashboard = () => {
                 ) : null}
               </>
             ) : (
-              <div className="mt-3 text-sm text-gray-300">
-                You haven't sold anything yet.
-              </div>
+              <div className="mt-3 text-sm text-gray-300">You haven't sold anything yet.</div>
             )}
           </div>
         </div>

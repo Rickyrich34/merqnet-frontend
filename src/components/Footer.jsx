@@ -11,25 +11,24 @@ const Footer = () => {
     <footer
       className="
         w-full
-        bg-black/30
-        backdrop-blur-md
-        text-white
-        py-3
         fixed
         bottom-0
         left-0
-        z-50
-        shadow-lg
+        z-[9999]
+        bg-black/40
+        backdrop-blur-md
+        text-white
+        py-3
+        border-t border-white/10
+        shadow-[0_-10px_30px_rgba(0,0,0,0.35)]
       "
     >
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
-
         {/* Logo */}
         <h1 className="text-lg font-semibold tracking-wide">MerqNet</h1>
 
         {/* Links */}
         <div className="flex items-center space-x-6 text-sm">
-
           {!token && (
             <Link
               to="/login"
@@ -62,7 +61,6 @@ const Footer = () => {
 
         {/* Social Icons */}
         <div className="flex items-center space-x-4 opacity-90">
-
           {/* Facebook */}
           <a
             href="https://www.facebook.com/merqnet"
@@ -94,9 +92,7 @@ const Footer = () => {
             </svg>
           </a>
 
-          {/* X (Twitter) */}
-         
-
+          {/* X (Twitter) - (you left it blank, ok) */}
         </div>
       </div>
 

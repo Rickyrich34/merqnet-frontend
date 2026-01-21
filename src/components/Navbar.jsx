@@ -1,4 +1,3 @@
-// src/components/Navbar.jsx
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import logopic2 from "../assets/logopic2.png";
@@ -26,7 +25,6 @@ const Navbar = () => {
 
     setIsLoggedIn(!!token);
 
-    // If we don't have API or userId, don't fetch email (avoid crashes / bad calls)
     if (!token || !userId || !API) return;
 
     fetch(`${API}/api/users/profile/${userId}`, {
@@ -37,8 +35,8 @@ const Navbar = () => {
         return res.json();
       })
       .then((data) => {
-        // Support multiple backend shapes: {email}, {user:{email}}, etc.
-        const email = data?.email || data?.user?.email || data?.profile?.email || "";
+        const email =
+          data?.email || data?.user?.email || data?.profile?.email || "";
         if (email) {
           setUserEmail(email);
           localStorage.setItem("userEmail", email);
@@ -61,9 +59,16 @@ const Navbar = () => {
     "text-white font-semibold text-sm sm:text-base drop-shadow-[0_0_6px_rgba(255,255,255,0.85)] hover:opacity-90 transition";
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md border-b border-white/10">
+    <nav
+      className="
+        fixed top-0 left-0 right-0
+        z-[9999]
+        bg-[#070615]/90 backdrop-blur-md
+        border-b border-white/10
+      "
+    >
       <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
-        {/* LEFT: Brand + (optional) email */}
+        {/* LEFT */}
         <div className="flex items-center gap-3 min-w-0">
           <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-2">
             <img
@@ -83,7 +88,7 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* RIGHT: Links */}
+        {/* RIGHT */}
         <div className="flex items-center gap-4 sm:gap-8">
           {!isLoggedIn ? (
             <>

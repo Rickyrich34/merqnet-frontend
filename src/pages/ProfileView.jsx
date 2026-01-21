@@ -146,8 +146,9 @@ export default function ProfileView() {
               ← Back to Dashboard
             </button>
 
+            {/* FIXED PATH HERE */}
             <button
-              onClick={() => navigate("/settings")}
+              onClick={() => navigate("/editprofile")}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 font-semibold hover:scale-105 transition-transform duration-200"
             >
               Settings

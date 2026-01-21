@@ -413,7 +413,7 @@ const MainDashboard = () => {
           <ActionButton
             label="Buyer"
             icon={ShoppingCart}
-            onClick={() => navigate("/buyerdashboard")}
+            onClick={() => navigate("/buyer-dashboard")}
             badgeCount={0}
             tintClass="from-cyan-500 via-blue-600 to-indigo-700"
           />
@@ -421,7 +421,7 @@ const MainDashboard = () => {
           <ActionButton
             label="Seller"
             icon={Tag}
-            onClick={() => navigate("/sellerdashboard")}
+            onClick={() => navigate("/seller-dashboard")}
             badgeCount={0}
             tintClass="from-fuchsia-500 via-pink-600 to-rose-700"
           />

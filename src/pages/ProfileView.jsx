@@ -2,17 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL;
+const API =
+  import.meta.env.VITE_API_URL ||
+  "https://merqnet-backend-production.up.railway.app";
 
 export default function ProfileView() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token =
+      localStorage.getItem("userToken") ||
+      localStorage.getItem("token");
+
     const userId = localStorage.getItem("userId");
 
-    if (!token || !userId) return;
+    if (!token || !userId) {
+      console.log("Profile: missing token or userId");
+      return;
+    }
 
     const fetchUser = async () => {
       try {
@@ -27,7 +35,7 @@ export default function ProfileView() {
 
         setUser(res.data);
       } catch (error) {
-        console.log("Error cargando usuario:", error);
+        console.error("Error loading profile:", error);
       }
     };
 
@@ -37,7 +45,7 @@ export default function ProfileView() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-black">
-        Cargando...
+        Loading profile...
       </div>
     );
   }
@@ -66,47 +74,47 @@ export default function ProfileView() {
         border border-purple-700
       "
       >
-        {/* CABECERA */}
+        {/* HEADER */}
         <div className="flex flex-col items-start">
           <h1 className="text-3xl md:text-4xl font-bold mb-1 drop-shadow-[0_0_8px_#bb00ff]">
             {user.fullName}
           </h1>
           <p className="text-purple-300 text-base md:text-lg">{user.email}</p>
           <p className="text-purple-300 text-base md:text-lg">
-            Teléfono: {user.phone}
+            Phone: {user.phone}
           </p>
         </div>
 
         <div className="mt-10 border-t border-purple-700/40 pt-6">
           <h2 className="text-xl md:text-2xl mb-2 font-semibold text-purple-400 drop-shadow-[0_0_8px_#9d00ff]">
-            Intercambio Internacional
+            International Trading
           </h2>
           <p className="text-lg">
-            {user.acceptsInternationalTrade ? "Disponible" : "Solo Local"}
+            {user.acceptsInternationalTrade ? "Available" : "Local only"}
           </p>
 
           <h2 className="text-xl md:text-2xl mt-6 mb-2 font-semibold text-purple-400 drop-shadow-[0_0_8px_#9d00ff]">
-            Dirección Predeterminada
+            Default Shipping Address
           </h2>
 
           {defaultAddress ? (
             <div className="bg-purple-900/30 p-5 md:p-6 rounded-xl border border-purple-700 shadow-[0_0_20px_#7c00ff] text-sm md:text-base">
-              <p><strong>Calle:</strong> {defaultAddress.streetAddress}</p>
-              <p><strong>Ciudad/Pueblo:</strong> {defaultAddress.city}</p>
-              <p><strong>Estado/Provincia:</strong> {defaultAddress.state}</p>
-              <p><strong>País:</strong> {defaultAddress.country}</p>
-              <p><strong>Código Postal:</strong> {defaultAddress.postalCode}</p>
+              <p><strong>Street:</strong> {defaultAddress.streetAddress}</p>
+              <p><strong>City:</strong> {defaultAddress.city}</p>
+              <p><strong>State:</strong> {defaultAddress.state}</p>
+              <p><strong>Country:</strong> {defaultAddress.country}</p>
+              <p><strong>Postal Code:</strong> {defaultAddress.postalCode}</p>
             </div>
           ) : (
-            <p>No hay direcciones de envío registradas.</p>
+            <p>No shipping addresses registered.</p>
           )}
 
           <h2 className="text-xl md:text-2xl mt-6 mb-2 font-semibold text-purple-400 drop-shadow-[0_0_8px_#9d00ff]">
-            Información de la Cuenta
+            Account Info
           </h2>
 
-          <p>Creado: {new Date(user.createdAt).toLocaleString()}</p>
-          <p>Actualizado: {new Date(user.updatedAt).toLocaleString()}</p>
+          <p>Created: {new Date(user.createdAt).toLocaleString()}</p>
+          <p>Updated: {new Date(user.updatedAt).toLocaleString()}</p>
 
           <div className="mt-8 flex flex-wrap gap-4">
             <button
@@ -120,7 +128,7 @@ export default function ProfileView() {
               onClick={() => navigate("/editprofile")}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 font-semibold hover:scale-105 transition-transform duration-200"
             >
-              Editar Perfil
+              Edit Profile
             </button>
           </div>
         </div>

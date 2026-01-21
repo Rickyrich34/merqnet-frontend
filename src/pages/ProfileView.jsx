@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const API =
-  import.meta.env.VITE_API_URL ||
-  "https://merqnet-backend-production.up.railway.app";
+const API = (
+  import.meta?.env?.VITE_API_URL ||
+  import.meta?.env?.VITE_API_BASE_URL ||
+  "https://merqnet-backend-production.up.railway.app"
+).replace(/\/$/, "");
 
 export default function ProfileView() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authMissing, setAuthMissing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,34 +22,54 @@ export default function ProfileView() {
     const userId = localStorage.getItem("userId");
 
     if (!token || !userId) {
-      console.log("Profile: missing token or userId");
+      setAuthMissing(true);
+      setLoading(false);
       return;
     }
 
     const fetchUser = async () => {
       try {
-        const res = await axios.get(
-          `${API}/api/users/profile/${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const res = await axios.get(`${API}/api/users/profile/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setUser(res.data);
       } catch (error) {
         console.error("Error loading profile:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchUser();
   }, []);
 
-  if (!user) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-black">
         Loading profile...
+      </div>
+    );
+  }
+
+  if (authMissing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-white bg-black gap-4 px-6 text-center">
+        <p className="text-lg text-white/80">Please login to view your profile.</p>
+        <button
+          onClick={() => navigate("/login")}
+          className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 font-semibold hover:scale-105 transition-transform duration-200"
+        >
+          Go to Login
+        </button>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white bg-black">
+        Could not load profile.
       </div>
     );
   }
@@ -58,21 +82,20 @@ export default function ProfileView() {
     <div
       className="min-h-screen pt-20 pb-40 px-4 md:px-6 text-white flex justify-center"
       style={{
-        background:
-          "linear-gradient(135deg, #0a0122 0%, #120034 50%, #1a0060 100%)",
+        background: "linear-gradient(135deg, #0a0122 0%, #120034 50%, #1a0060 100%)",
       }}
     >
       <div
         className="
-        w-full 
-        max-w-xl
-        bg-black/40 
-        backdrop-blur-xl 
-        p-8 md:p-10 
-        rounded-2xl 
-        shadow-[0_0_25px_#9900ff] 
-        border border-purple-700
-      "
+          w-full
+          max-w-xl
+          bg-black/40
+          backdrop-blur-xl
+          p-8 md:p-10
+          rounded-2xl
+          shadow-[0_0_25px_#9900ff]
+          border border-purple-700
+        "
       >
         {/* HEADER */}
         <div className="flex flex-col items-start">
@@ -80,9 +103,7 @@ export default function ProfileView() {
             {user.fullName}
           </h1>
           <p className="text-purple-300 text-base md:text-lg">{user.email}</p>
-          <p className="text-purple-300 text-base md:text-lg">
-            Phone: {user.phone}
-          </p>
+          <p className="text-purple-300 text-base md:text-lg">Phone: {user.phone}</p>
         </div>
 
         <div className="mt-10 border-t border-purple-700/40 pt-6">
@@ -113,8 +134,8 @@ export default function ProfileView() {
             Account Info
           </h2>
 
-          <p>Created: {new Date(user.createdAt).toLocaleString()}</p>
-          <p>Updated: {new Date(user.updatedAt).toLocaleString()}</p>
+          <p>Created: {user.createdAt ? new Date(user.createdAt).toLocaleString() : "—"}</p>
+          <p>Updated: {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : "—"}</p>
 
           <div className="mt-8 flex flex-wrap gap-4">
             <button
@@ -125,10 +146,10 @@ export default function ProfileView() {
             </button>
 
             <button
-              onClick={() => navigate("/editprofile")}
+              onClick={() => navigate("/settings")}
               className="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-purple-500 font-semibold hover:scale-105 transition-transform duration-200"
             >
-              Edit Profile
+              Settings
             </button>
           </div>
         </div>
@@ -136,3 +157,4 @@ export default function ProfileView() {
     </div>
   );
 }
+

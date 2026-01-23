@@ -1,3 +1,4 @@
+// App.jsx
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
@@ -46,7 +47,6 @@ function App() {
   return (
     <Router>
       <InactivityLogout timeout={15 * 60 * 1000} />
-      
 
       <Navbar />
 
@@ -63,6 +63,10 @@ function App() {
 
         {/* REQUESTS / BIDS FLOW */}
         <Route path="/create-request" element={<CreateRequest />} />
+
+        {/* ✅ ALIAS: user is hitting /createrequest (no dash) in production */}
+        <Route path="/createrequest" element={<CreateRequest />} />
+
         <Route path="/submit-bid/:requestId" element={<SubmitBid />} />
         <Route path="/submitbid/:requestId" element={<SubmitBid />} />
 

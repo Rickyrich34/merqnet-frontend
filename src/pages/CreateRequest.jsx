@@ -1,3 +1,4 @@
+// CreateRequest.jsx
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
@@ -165,7 +166,8 @@ export default function CreateRequest() {
       body: JSON.stringify(payload),
     });
 
-    if (res.ok) navigate("/buyerdashboard");
+    // ✅ FIX: your actual route is /buyer-dashboard (with dash)
+    if (res.ok) navigate("/buyer-dashboard");
     else {
       const data = await res.json().catch(() => ({}));
       alert(data?.message || `Error creating request (${res.status})`);
@@ -196,7 +198,7 @@ export default function CreateRequest() {
       >
         {/* Back arrow attached to the card */}
         <button
-          onClick={() => navigate("/buyerdashboard")}
+          onClick={() => navigate("/buyer-dashboard")}
           className="
             absolute -top-12 left-1
             rounded-xl

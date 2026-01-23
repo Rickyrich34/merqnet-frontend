@@ -118,7 +118,7 @@ function isRequestClosed(req) {
   return false;
 }
 
-// ✅ Axios instance with timeout so “Checking offers…” won’t hang forever
+// ✅ Axios instance with timeout so requests won't hang forever
 const http = axios.create({
   timeout: 12000,
 });
@@ -174,71 +174,77 @@ const SellerDashboard = () => {
 
   const matchingCount = visibleRequests.length;
 
+  // ✅ CRITICAL FIX: DO NOT SPAM backend with Promise.all() to /bids/request/:id
+  // Run sequentially so Railway doesn't time out.
   useEffect(() => {
+    let cancelled = false;
+
     const loadOffers = async () => {
       try {
         if (!userId || visibleRequests.length === 0) {
-          setOfferMap({});
+          if (!cancelled) setOfferMap({});
           return;
         }
 
-        setOffersLoading(true);
+        if (!cancelled) setOffersLoading(true);
 
-        const results = await Promise.all(
-          visibleRequests.map(async (r) => {
-            // If somehow closed slips in, mark ended
-            if (isRequestClosed(r)) {
-              return [String(r._id), { bestPrice: 0, myPrice: 0, status: "ENDED" }];
-            }
+        const map = {};
 
-            try {
-              const res = await http.get(`${API_BASE_URL}/api/bids/request/${r._id}`, {
-                headers: authHeaders(),
-              });
+        for (const r of visibleRequests) {
+          if (cancelled) return;
 
-              const bids = Array.isArray(res.data) ? res.data : [];
+          // If somehow closed slips in, mark ended
+          if (isRequestClosed(r)) {
+            map[String(r._id)] = { bestPrice: 0, myPrice: 0, status: "ENDED" };
+            continue;
+          }
 
-              // best = lowest totalPrice
-              const withPrice = bids
-                .map((b) => ({ b, price: safeNumber(b?.totalPrice) }))
-                .filter((x) => x.price > 0);
+          try {
+            const res = await http.get(`${API_BASE_URL}/api/bids/request/${r._id}`, {
+              headers: authHeaders(),
+            });
 
-              const best = withPrice.sort((a, b) => a.price - b.price)[0] || null;
+            const bids = Array.isArray(res.data) ? res.data : [];
 
-              const myBids = bids
-                .filter((b) => String(b?.sellerId?._id || b?.sellerId) === String(userId))
-                .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+            // best = lowest totalPrice
+            const withPrice = bids
+              .map((b) => ({ b, price: safeNumber(b?.totalPrice) }))
+              .filter((x) => x.price > 0);
 
-              const myLatest = myBids[0] || null;
+            const best = withPrice.sort((a, b) => a.price - b.price)[0] || null;
 
-              const bestPrice = best ? best.price : 0;
-              const myPrice = myLatest ? safeNumber(myLatest?.totalPrice) : 0;
+            const myBids = bids
+              .filter((b) => String(b?.sellerId?._id || b?.sellerId) === String(userId))
+              .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
 
-              let status = "NO_OFFER";
-              if (bestPrice > 0 && myPrice > 0) status = bestPrice === myPrice ? "WINNING" : "OUTBID";
-              else if (myPrice > 0) status = "WINNING";
+            const myLatest = myBids[0] || null;
 
-              return [String(r._id), { bestPrice, myPrice, status }];
-            } catch (e) {
-              console.error("Offer load failed for request:", r?._id, e?.message || e);
-              // Don’t hang UI: mark as NO_OFFER if bids fetch fails
-              return [String(r._id), { bestPrice: 0, myPrice: 0, status: "NO_OFFER" }];
-            }
-          })
-        );
+            const bestPrice = best ? best.price : 0;
+            const myPrice = myLatest ? safeNumber(myLatest?.totalPrice) : 0;
 
-        const map = results.reduce((acc, [k, v]) => {
-          acc[k] = v;
-          return acc;
-        }, {});
+            let status = "NO_OFFER";
+            if (bestPrice > 0 && myPrice > 0) status = bestPrice === myPrice ? "WINNING" : "OUTBID";
+            else if (myPrice > 0) status = "WINNING";
 
-        setOfferMap(map);
+            map[String(r._id)] = { bestPrice, myPrice, status };
+          } catch (e) {
+            console.error("Offer load failed for request:", r?._id, e?.message || e);
+            // Don’t hang UI: mark as NO_OFFER if bids fetch fails
+            map[String(r._id)] = { bestPrice: 0, myPrice: 0, status: "NO_OFFER" };
+          }
+        }
+
+        if (!cancelled) setOfferMap(map);
       } finally {
-        setOffersLoading(false);
+        if (!cancelled) setOffersLoading(false);
       }
     };
 
     loadOffers();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userId, visibleRequests]);
 
   if (loading) return <p className="text-white pt-44">Loading...</p>;

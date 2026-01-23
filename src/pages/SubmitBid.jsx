@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -19,7 +20,13 @@ import {
 import logopic2 from "../assets/logopic2.png";
 import Galactic1 from "../assets/Galactic1.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+// ✅ Match SellerDashboard env fallback
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
+// ✅ Axios instance with timeout (no infinite hang)
+const http = axios.create({
+  timeout: 12000,
+});
 
 function getToken() {
   return localStorage.getItem("userToken") || localStorage.getItem("token") || "";
@@ -59,18 +66,6 @@ function formatShipping(addr) {
   return full || compact || null;
 }
 
-// ✅ NEW: prevent infinite pending requests
-async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(id);
-  }
-}
-
 export default function SubmitBid() {
   const { requestId } = useParams();
   const navigate = useNavigate();
@@ -82,7 +77,6 @@ export default function SubmitBid() {
 
   const [unitPrice, setUnitPrice] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
-
   const [deliveryTime, setDeliveryTime] = useState("");
 
   const [photos, setPhotos] = useState([]);
@@ -116,53 +110,41 @@ export default function SubmitBid() {
         return;
       }
 
-      // 1) Load request (✅ timeout)
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/requests/${requestId}`, {
+      // 1) Load request
+      const res = await http.get(`${API_BASE_URL}/api/requests/${requestId}`, {
         headers: authHeaders(),
       });
 
-      if (!res.ok) {
-        setRequest(null);
-        return;
-      }
+      setRequest(res.data);
 
-      const reqData = await res.json();
-      setRequest(reqData);
-
-      // 2) Load bids (✅ timeout)
+      // 2) Load bids for this request
       try {
-        const bidRes = await fetchWithTimeout(`${API_BASE_URL}/api/bids/request/${requestId}`, {
+        const bidRes = await http.get(`${API_BASE_URL}/api/bids/request/${requestId}`, {
           headers: authHeaders(),
         });
 
-        if (bidRes.ok) {
-          const bids = await bidRes.json();
+        const bids = Array.isArray(bidRes.data) ? bidRes.data : [];
 
-          const mine =
-            Array.isArray(bids) &&
-            bids.find((b) => String(b?.sellerId?._id || b?.sellerId) === String(sellerId));
+        const mine =
+          Array.isArray(bids) &&
+          bids.find((b) => String(b?.sellerId?._id || b?.sellerId) === String(sellerId));
 
-          if (mine) {
-            setMyBid(mine);
-            setUnitPrice(String(mine.unitPrice ?? ""));
-            setTotalPrice(String(mine.totalPrice ?? ""));
-            setDeliveryTime(String(mine.deliveryTime ?? ""));
+        if (mine) {
+          setMyBid(mine);
+          setUnitPrice(String(mine.unitPrice ?? ""));
+          setTotalPrice(String(mine.totalPrice ?? ""));
+          setDeliveryTime(String(mine.deliveryTime ?? ""));
 
-            const imgs = Array.isArray(mine.images) ? mine.images : [];
-            setExistingImages(imgs);
-            setShowAdvanced(false);
-          } else {
-            setMyBid(null);
-            setExistingImages([]);
-            setShowAdvanced(true);
-          }
+          const imgs = Array.isArray(mine.images) ? mine.images : [];
+          setExistingImages(imgs);
+          setShowAdvanced(false);
         } else {
           setMyBid(null);
           setExistingImages([]);
           setShowAdvanced(true);
         }
       } catch {
-        // If bids endpoint hangs/fails -> still render page (no infinite loading)
+        // bids endpoint timeout/error -> still render page
         setMyBid(null);
         setExistingImages([]);
         setShowAdvanced(true);
@@ -199,16 +181,15 @@ export default function SubmitBid() {
       return;
     }
 
-    const isUpdate = !!myBid;
-
     if (!deliveryTime) {
       alert("Delivery Time is required.");
       return;
     }
 
     try {
-      let imagesToSend = [];
+      const isUpdate = !!myBid;
 
+      let imagesToSend = [];
       if (photos.length) {
         imagesToSend = await Promise.all(photos.map(fileToBase64));
       } else if (isUpdate && existingImages.length) {
@@ -225,25 +206,24 @@ export default function SubmitBid() {
         images: imagesToSend,
       };
 
-      // ✅ POST with timeout (so it never hangs)
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/bids/request/${requestId}`, {
-        method: "POST",
+      // ✅ POST with axios timeout
+      const postRes = await http.post(`${API_BASE_URL}/api/bids/request/${requestId}`, payload, {
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify(payload),
       });
 
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        alert(data?.message || `Error submitting bid (${res.status})`);
+      if (!postRes || !postRes.data) {
+        alert("Error submitting bid.");
         return;
       }
 
       alert(isUpdate ? "Offer updated successfully!" : "Bid submitted successfully!");
       navigate("/seller-dashboard");
     } catch (e) {
-      // If server hangs (AbortError) or network error
-      alert("Server timeout / error submitting bid. Try again.");
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        (e?.code === "ECONNABORTED" ? "Server timeout submitting bid. Try again." : "Error submitting bid. Try again.");
+      alert(msg);
     }
   };
 
@@ -457,10 +437,7 @@ export default function SubmitBid() {
                     </div>
 
                     {existingImages.length > 0 ? (
-                      <button
-                        onClick={clearExistingImages}
-                        className="text-[11px] text-red-200 hover:text-red-100"
-                      >
+                      <button onClick={clearExistingImages} className="text-[11px] text-red-200 hover:text-red-100">
                         Clear saved images
                       </button>
                     ) : null}

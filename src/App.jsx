@@ -64,6 +64,8 @@ function App() {
         {/* REQUESTS / BIDS FLOW */}
         <Route path="/create-request" element={<CreateRequest />} />
         <Route path="/submit-bid/:requestId" element={<SubmitBid />} />
+        <Route path="/submitbid/:requestId" element={<SubmitBid />} />
+
         <Route path="/accept-bid/:bidId" element={<AcceptBid />} />
 
         {/* ✅ FIX: route used by BuyerDashboard View Offers button */}

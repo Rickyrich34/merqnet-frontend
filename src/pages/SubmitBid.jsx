@@ -60,7 +60,8 @@ function formatShipping(addr) {
 }
 
 export default function SubmitBid() {
-  const { id: requestId } = useParams();
+  // ✅ FIX: App route is /submit-bid/:requestId so params key is requestId
+  const { requestId } = useParams();
   const navigate = useNavigate();
 
   const sellerId = localStorage.getItem("userId") || "";
@@ -244,7 +245,8 @@ export default function SubmitBid() {
       }
 
       alert(isUpdate ? "Offer updated successfully!" : "Bid submitted successfully!");
-      navigate("/sellerdashboard");
+      // ✅ FIX: route in App.jsx is /seller-dashboard
+      navigate("/seller-dashboard");
     } catch {
       alert("Server error submitting bid.");
     }
@@ -301,7 +303,8 @@ export default function SubmitBid() {
       <div className="relative z-10 max-w-5xl mx-auto pt-44 px-6 pb-24">
         {/* Back */}
         <button
-          onClick={() => navigate("/sellerdashboard")}
+          // ✅ FIX: route in App.jsx is /seller-dashboard
+          onClick={() => navigate("/seller-dashboard")}
           className="
             rounded-2xl
             border border-cyan-400/25
@@ -622,7 +625,8 @@ export default function SubmitBid() {
                 </button>
 
                 <button
-                  onClick={() => navigate("/sellerdashboard")}
+                  // ✅ FIX: route in App.jsx is /seller-dashboard
+                  onClick={() => navigate("/seller-dashboard")}
                   className="w-full text-xs text-white/70 hover:text-white transition"
                 >
                   Cancel and return

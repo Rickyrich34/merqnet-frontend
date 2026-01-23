@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -20,14 +19,10 @@ import {
 import logopic2 from "../assets/logopic2.png";
 import Galactic1 from "../assets/Galactic1.png";
 
-// ✅ Match SellerDashboard env fallback
+// ✅ Keep your env fallback (works on Railway + local) — matches SellerDashboard approach
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
-// ✅ Axios instance with timeout (no infinite hang)
-const http = axios.create({
-  timeout: 12000,
-});
-
+// --- helpers ---
 function getToken() {
   return localStorage.getItem("userToken") || localStorage.getItem("token") || "";
 }
@@ -66,22 +61,29 @@ function formatShipping(addr) {
   return full || compact || null;
 }
 
-// ✅ Convert "5 days" or "3-5 business days" -> 5
-function deliveryTimeToDays(input) {
-  const raw = String(input || "").trim();
-  if (!raw) return null;
+// ✅ critical: sanitize price so "$7,000.00" -> 7000, and "" -> NaN
+function toMoneyNumber(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return NaN;
+  const cleaned = s.replace(/[^\d.-]/g, ""); // remove $ , spaces, etc
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+}
 
-  const nums = raw.match(/\d+(\.\d+)?/g);
-  if (!nums || !nums.length) return null;
-
-  // take the max number found (e.g., "3-5" => 5)
-  const values = nums.map((n) => Number(n)).filter((n) => Number.isFinite(n));
-  if (!values.length) return null;
-
-  return Math.max(...values);
+// ✅ fetch with timeout using AbortController (prevents “stuck loading”)
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 export default function SubmitBid() {
+  // Works for BOTH routes: /submitbid/:requestId and /submit-bid/:requestId
   const { requestId } = useParams();
   const navigate = useNavigate();
 
@@ -89,19 +91,21 @@ export default function SubmitBid() {
 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
+  // Pricing
   const [unitPrice, setUnitPrice] = useState("");
   const [totalPrice, setTotalPrice] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("");
 
-  const [photos, setPhotos] = useState([]);
+  // Delivery + images (UI keeps them; backend currently only requires prices)
+  const [deliveryTime, setDeliveryTime] = useState("");
+  const [photos, setPhotos] = useState([]); // File[]
   const photoPreviews = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
 
+  // Existing bid (if any)
   const [myBid, setMyBid] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(true);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -119,58 +123,74 @@ export default function SubmitBid() {
     try {
       setLoading(true);
 
-      if (!requestId) {
+      if (!API_BASE_URL) {
         setRequest(null);
-        setMyBid(null);
-        setExistingImages([]);
-        setShowAdvanced(true);
         return;
       }
 
       // 1) Load request
-      const res = await http.get(`${API_BASE_URL}/api/requests/${requestId}`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/requests/${requestId}`, {
         headers: authHeaders(),
       });
 
-      setRequest(res.data);
+      if (!res.ok) {
+        setRequest(null);
+        return;
+      }
 
-      // 2) Load bids for this request
+      const reqData = await res.json();
+      setRequest(reqData);
+
+      // 2) Load bids for request -> find my bid
       try {
-        const bidRes = await http.get(`${API_BASE_URL}/api/bids/request/${requestId}`, {
+        const bidRes = await fetchWithTimeout(`${API_BASE_URL}/api/bids/request/${requestId}`, {
           headers: authHeaders(),
         });
 
-        const bids = Array.isArray(bidRes.data) ? bidRes.data : [];
+        if (bidRes.ok) {
+          const bids = await bidRes.json();
 
-        const mine =
-          Array.isArray(bids) &&
-          bids.find((b) => String(b?.sellerId?._id || b?.sellerId) === String(sellerId));
+          const mine =
+            Array.isArray(bids) &&
+            bids.find((b) => String(b?.sellerId?._id || b?.sellerId) === String(sellerId));
 
-        if (mine) {
-          setMyBid(mine);
-          setUnitPrice(String(mine.unitPrice ?? ""));
-          setTotalPrice(String(mine.totalPrice ?? ""));
-          setDeliveryTime(String(mine.deliveryTime ?? ""));
+          if (mine) {
+            setMyBid(mine);
 
-          const imgs = Array.isArray(mine.images) ? mine.images : [];
-          setExistingImages(imgs);
-          setShowAdvanced(false);
+            // Prefill pricing
+            setUnitPrice(String(mine.unitPrice ?? ""));
+            setTotalPrice(String(mine.totalPrice ?? ""));
+
+            // Preserve delivery + images (if present)
+            setDeliveryTime(String(mine.deliveryTime ?? "Negotiated in chat"));
+            const imgs = Array.isArray(mine.images) ? mine.images : [];
+            setExistingImages(imgs);
+
+            setShowAdvanced(false);
+          } else {
+            setMyBid(null);
+            setExistingImages([]);
+            setShowAdvanced(true);
+            setDeliveryTime("Negotiated in chat");
+          }
         } else {
           setMyBid(null);
           setExistingImages([]);
           setShowAdvanced(true);
+          setDeliveryTime("Negotiated in chat");
         }
       } catch {
-        // bids endpoint timeout/error -> still render page
         setMyBid(null);
         setExistingImages([]);
         setShowAdvanced(true);
+        setDeliveryTime("Negotiated in chat");
       }
     } catch {
       setRequest(null);
       setMyBid(null);
       setExistingImages([]);
       setShowAdvanced(true);
+      setDeliveryTime("Negotiated in chat");
     } finally {
       setLoading(false);
     }
@@ -179,6 +199,7 @@ export default function SubmitBid() {
   const onPickPhotos = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+
     const next = [...photos, ...files].slice(0, 2);
     setPhotos(next);
     e.target.value = "";
@@ -193,32 +214,32 @@ export default function SubmitBid() {
   };
 
   const submitBid = async () => {
-    if (isSubmitting) return;
-
-    if (!sellerId) {
-      alert("Missing sellerId. Please log out and log in again.");
+    if (!API_BASE_URL) {
+      alert("Missing API base URL. Check VITE_API_URL / VITE_API_BASE_URL.");
       return;
     }
 
-    const u = Number(unitPrice);
-    const t = Number(totalPrice);
+    // ✅ parse + validate numbers safely
+    const u = toMoneyNumber(unitPrice);
+    const t = toMoneyNumber(totalPrice);
 
-    if (!Number.isFinite(u) || u <= 0 || !Number.isFinite(t) || t <= 0) {
+    if (!Number.isFinite(u) || !Number.isFinite(t) || u <= 0 || t <= 0) {
       alert("Enter valid Unit Price and Total Lot Price (numbers only).");
       return;
     }
 
-    const deliveryDays = deliveryTimeToDays(deliveryTime);
-    if (!deliveryDays || !Number.isFinite(deliveryDays) || deliveryDays <= 0) {
-      alert("Delivery Time must include a valid number of days (e.g. 5 or 3-5 days).");
-      return;
-    }
+    // Delivery is NOT required by your backend createBid (it sets it itself),
+    // but keep UI consistent and prevent empty string.
+    const deliverySafe = String(deliveryTime || "Negotiated in chat");
 
     try {
-      setIsSubmitting(true);
+      setSubmitting(true);
 
       const isUpdate = !!myBid;
 
+      // Images:
+      // - if user picked new photos, send them
+      // - else preserve existing images (if any)
       let imagesToSend = [];
       if (photos.length) {
         imagesToSend = await Promise.all(photos.map(fileToBase64));
@@ -228,42 +249,41 @@ export default function SubmitBid() {
         imagesToSend = [];
       }
 
+      // ✅ IMPORTANT: backend expects EXACT names: unitPrice + totalPrice
       const payload = {
-        requestId,
+        // sellerId in body is optional (backend uses token), but leaving it is fine
         sellerId,
         unitPrice: u,
         totalPrice: t,
-        deliveryTime: deliveryDays, // ✅ send NUMBER of days
+        deliveryTime: deliverySafe,
         images: imagesToSend,
       };
 
-      const postRes = await http.post(`${API_BASE_URL}/api/bids/request/${requestId}`, payload, {
-        headers: authHeaders({ "Content-Type": "application/json" }),
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE_URL}/api/bids/request/${requestId}`,
+        {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(payload),
+        },
+        12000
+      );
 
-      if (!postRes || !postRes.data) {
-        alert("Error submitting bid.");
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Show real backend message (most likely "Missing fields")
+        alert(data?.message || `Bid submit failed (${res.status})`);
         return;
       }
 
-      alert(isUpdate ? "Offer updated successfully!" : "Bid submitted successfully!");
+      alert(isUpdate ? "Offer updated successfully!" : "Offer submitted successfully!");
       navigate("/seller-dashboard");
-    } catch (e) {
-      const status = e?.response?.status;
-      const serverMsg = e?.response?.data?.message || e?.response?.data?.error;
-
-      if (status === 400 && !serverMsg) {
-        alert("Bad Request (400). Backend rejected the bid payload. Check required fields/types (deliveryTime must be a number of days).");
-      } else {
-        const msg =
-          serverMsg ||
-          (e?.code === "ECONNABORTED"
-            ? "Server timeout submitting bid. Try again."
-            : "Error submitting bid. Try again.");
-        alert(msg);
-      }
+    } catch (err) {
+      // AbortController timeout or network issue
+      alert("Server timeout submitting bid. Try again.");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -285,6 +305,7 @@ export default function SubmitBid() {
 
   const shipText = formatShipping(request?.shippingAddress);
 
+  // Styles
   const fieldCard = "rounded-2xl border border-white/12 bg-[#0a0128]/55 p-4";
   const inputBase =
     "w-full rounded-xl bg-black/55 border border-white/25 px-3 py-2.5 text-sm text-white/90 outline-none " +
@@ -293,6 +314,7 @@ export default function SubmitBid() {
 
   return (
     <div className="relative min-h-screen w-full text-white overflow-x-hidden bg-black">
+      {/* Background */}
       <div className="absolute inset-0 -z-10">
         <div
           className="absolute inset-0"
@@ -303,126 +325,121 @@ export default function SubmitBid() {
             backgroundRepeat: "no-repeat",
           }}
         />
-        <div className="absolute inset-0 bg-black/55" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(900px 600px at 18% 12%, rgba(34,211,238,0.12), transparent 58%), radial-gradient(900px 650px at 82% 24%, rgba(245,158,11,0.10), transparent 62%), radial-gradient(900px 700px at 50% 90%, rgba(148,163,184,0.06), transparent 65%)",
-          }}
-        />
+        <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto pt-44 px-6 pb-24">
-        <button
-          onClick={() => navigate("/seller-dashboard")}
-          className="
-            rounded-2xl
-            border border-cyan-400/25
-            bg-[#0B001F]/80
-            hover:bg-[#0B001F]
-            transition
-            p-2.5
-            shadow-[0_0_18px_rgba(34,211,238,0.14)]
-            backdrop-blur-md
-          "
-          aria-label="Back"
-        >
-          <ChevronLeft className="w-5 h-5 text-cyan-200" />
-        </button>
+      <div className="relative z-10 max-w-3xl mx-auto px-5 pt-40 pb-28">
+        {/* Top bar */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate("/seller-dashboard")}
+            className="
+              rounded-2xl
+              border border-cyan-400/25
+              bg-[#0B001F]/80
+              hover:bg-[#0B001F]
+              transition
+              p-2.5
+              shadow-[0_0_18px_rgba(34,211,238,0.14)]
+              backdrop-blur-md
+            "
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-5 h-5 text-cyan-200" />
+          </button>
 
-        <div className="mt-6 flex items-center gap-3">
-          <img
-            src={logopic2}
-            alt="MerqNet"
-            className="w-9 h-9 rounded-xl border border-white/15 bg-black/40 p-1"
-          />
-          <div>
-            <div className="text-xs text-white/60 flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-amber-200" />
-              MerqNet
+          <div className="flex items-center gap-3">
+            <img src={logopic2} alt="MerqNet" className="w-9 h-9 rounded-xl" />
+            <div>
+              <div className="flex items-center gap-2 text-xs text-white/70">
+                <Briefcase className="w-4 h-4 text-amber-200" />
+                <span>MerqNet</span>
+              </div>
+              <div className="text-lg font-semibold text-white/95">Submit Offer</div>
+              <div className="text-xs text-white/60">
+                You are submitting an offer for a buyer request.
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-white">Submit Offer</h1>
-            <p className="text-sm text-white/60">You are submitting an offer for a buyer request.</p>
           </div>
+
+          <div className="w-10" />
         </div>
 
-        <div className="mt-7 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 rounded-3xl border border-white/12 bg-[#0B001F]/75 p-6 shadow-[0_0_26px_rgba(2,6,23,0.55)] backdrop-blur-md">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs text-white/60 flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-cyan-200" />
-                    {request?.category || "Category"}
-                  </div>
-                  <div className="mt-1 text-2xl font-bold text-white">{request?.productName}</div>
-                </div>
-              </div>
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Request card */}
+          <div className="lg:col-span-2 rounded-3xl border border-white/15 bg-[#0B001F]/80 p-6 shadow-[0_0_26px_rgba(2,6,23,0.55)]">
+            <div className="text-xs text-white/70 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-cyan-200" />
+              <span>{request?.category || "Category"}</span>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={fieldCard}>
-                  <div className="text-xs text-white/60 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-amber-200" />
-                    Quantity
-                  </div>
-                  <div className="mt-2 text-white font-semibold">{request?.quantity ?? "N/A"}</div>
-                </div>
+            <h2 className="mt-2 text-2xl font-semibold text-white">
+              {request?.productName || "Request"}
+            </h2>
 
-                <div className={fieldCard}>
-                  <div className="text-xs text-white/60 flex items-center gap-2">
-                    <Ruler className="w-4 h-4 text-amber-200" />
-                    Size / Weight
-                  </div>
-                  <div className="mt-2 text-white font-semibold">{request?.sizeWeight || "N/A"}</div>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={fieldCard}>
+                <div className="text-xs text-white/70 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-amber-200" />
+                  <span>Quantity</span>
                 </div>
-
-                <div className={fieldCard}>
-                  <div className="text-xs text-white/60 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-cyan-200" />
-                    Ships to
-                  </div>
-                  <div className="mt-2 text-white font-semibold">{shipText || "Not provided"}</div>
-                </div>
-
-                <div className={fieldCard}>
-                  <div className="text-xs text-white/60 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-200" />
-                    Condition
-                  </div>
-                  <div className="mt-2 text-white font-semibold">{request?.condition || "N/A"}</div>
+                <div className="mt-2 text-white/90 font-semibold">
+                  {request?.quantity ?? "N/A"}
                 </div>
               </div>
 
               <div className={fieldCard}>
-                <div className="text-xs text-white/60 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-amber-200" />
-                  Description
+                <div className="text-xs text-white/70 flex items-center gap-2">
+                  <Ruler className="w-4 h-4 text-amber-200" />
+                  <span>Size / Weight</span>
                 </div>
-                <div className="mt-2 text-white/85">{request?.description || "No description."}</div>
+                <div className="mt-2 text-white/90 font-semibold">
+                  {request?.sizeWeight ?? "N/A"}
+                </div>
+              </div>
+
+              <div className={fieldCard}>
+                <div className="text-xs text-white/70 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-amber-200" />
+                  <span>Ships to</span>
+                </div>
+                <div className="mt-2 text-white/90 font-semibold">
+                  {shipText || "Not provided"}
+                </div>
+              </div>
+
+              <div className={fieldCard}>
+                <div className="text-xs text-white/70 flex items-center gap-2">
+                  <PencilLine className="w-4 h-4 text-amber-200" />
+                  <span>Condition</span>
+                </div>
+                <div className="mt-2 text-white/90 font-semibold">
+                  {request?.condition ?? "N/A"}
+                </div>
+              </div>
+
+              <div className={`${fieldCard} sm:col-span-2`}>
+                <div className="text-xs text-white/70 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-200" />
+                  <span>Description</span>
+                </div>
+                <div className="mt-2 text-white/85">
+                  {request?.description ?? "—"}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/12 bg-[#0B001F]/75 p-6 shadow-[0_0_26px_rgba(2,6,23,0.55)] backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold text-white">Your Offer</div>
-                <div className="text-xs text-white/60">
-                  {myBid ? "Updating existing offer" : "Submitting first offer"}
-                </div>
-              </div>
-
-              {myBid ? (
-                <span className="inline-flex items-center gap-2 text-[11px] px-3 py-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 text-emerald-200 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> EXISTING OFFER
-                </span>
-              ) : null}
+          {/* Offer form */}
+          <div className="rounded-3xl border border-white/15 bg-[#0B001F]/80 p-6 shadow-[0_0_26px_rgba(2,6,23,0.55)]">
+            <div className="text-sm font-semibold text-white/95 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-cyan-200" />
+              Your Offer
             </div>
 
-            <div className="mt-5 flex flex-col gap-4">
+            <div className="mt-4 space-y-4">
               <div>
-                <label className="text-xs text-white/70 flex items-center gap-2 mb-2">
+                <label className="text-xs text-white/70 flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-amber-200" />
                   Unit Price
                 </label>
@@ -430,12 +447,13 @@ export default function SubmitBid() {
                   className={inputBase}
                   value={unitPrice}
                   onChange={(e) => setUnitPrice(e.target.value)}
-                  placeholder="e.g. 12.50"
+                  placeholder="e.g. 75.00"
+                  inputMode="decimal"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-white/70 flex items-center gap-2 mb-2">
+                <label className="text-xs text-white/70 flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-amber-200" />
                   Total Lot Price
                 </label>
@@ -443,92 +461,100 @@ export default function SubmitBid() {
                   className={inputBase}
                   value={totalPrice}
                   onChange={(e) => setTotalPrice(e.target.value)}
-                  placeholder="e.g. 2500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-white/70 flex items-center gap-2 mb-2">
-                  <Truck className="w-4 h-4 text-cyan-200" />
-                  Delivery Time (days)
-                </label>
-                <input
-                  className={inputBase}
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  placeholder="e.g. 5 or 3-5 days"
+                  placeholder="e.g. 7000.00"
+                  inputMode="decimal"
                 />
               </div>
 
               <button
-                onClick={() => setShowAdvanced((p) => !p)}
-                className="mt-1 text-xs text-cyan-200 hover:text-cyan-100 flex items-center gap-2"
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="text-xs text-cyan-200 hover:text-cyan-100 underline"
               >
-                <PencilLine className="w-4 h-4" />
-                {showAdvanced ? "Hide images" : "Edit images"}
+                {showAdvanced ? "Hide" : "Show"} advanced (delivery & photos)
               </button>
 
-              {showAdvanced ? (
-                <div className="mt-2 rounded-2xl border border-white/12 bg-black/30 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-white/70 flex items-center gap-2">
-                      <Upload className="w-4 h-4 text-amber-200" />
-                      Photos (optional)
-                    </div>
-
-                    {existingImages.length > 0 ? (
-                      <button onClick={clearExistingImages} className="text-[11px] text-red-200 hover:text-red-100">
-                        Clear saved images
-                      </button>
-                    ) : null}
+              {showAdvanced && (
+                <>
+                  <div>
+                    <label className="text-xs text-white/70 flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-amber-200" />
+                      Delivery Time (days)
+                    </label>
+                    <input
+                      className={inputBase}
+                      value={deliveryTime}
+                      onChange={(e) => setDeliveryTime(e.target.value)}
+                      placeholder='e.g. "5 days"'
+                    />
                   </div>
 
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={onPickPhotos}
-                    className="mt-3 text-xs text-white/70"
-                  />
+                  <div className="rounded-2xl border border-white/12 bg-[#0a0128]/45 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-white/70 flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-amber-200" />
+                        Photos (optional)
+                      </div>
 
-                  {photoPreviews.length ? (
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      {photoPreviews.map((src, idx) => (
-                        <div key={src} className="relative rounded-xl overflow-hidden border border-white/10">
-                          <img src={src} alt="preview" className="w-full h-28 object-cover" />
-                          <button
-                            onClick={() => removePhotoAt(idx)}
-                            className="absolute top-2 right-2 bg-black/70 border border-white/20 rounded-lg p-1.5"
-                            aria-label="Remove"
-                          >
-                            <X className="w-4 h-4 text-white/80" />
-                          </button>
-                        </div>
-                      ))}
+                      {existingImages.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearExistingImages}
+                          className="text-xs text-red-200 hover:text-red-100 underline"
+                        >
+                          Clear existing photos
+                        </button>
+                      )}
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
+
+                    <div className="mt-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={onPickPhotos}
+                        className="block w-full text-xs text-white/70"
+                      />
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        {photoPreviews.map((src, idx) => (
+                          <div key={src} className="relative rounded-xl overflow-hidden border border-white/15">
+                            <img src={src} alt="preview" className="w-full h-28 object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removePhotoAt(idx)}
+                              className="absolute top-2 right-2 bg-black/70 border border-white/20 rounded-lg p-1 hover:bg-black"
+                            >
+                              <X className="w-4 h-4 text-white/80" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={submitBid}
-                disabled={isSubmitting}
+                disabled={submitting}
                 className="
-                  mt-2
-                  w-full
+                  mt-2 w-full
                   bg-amber-400 hover:bg-amber-300
-                  disabled:opacity-60 disabled:cursor-not-allowed
+                  disabled:bg-amber-400/40 disabled:text-black/60
                   text-black font-semibold
-                  py-3
-                  rounded-xl
+                  py-3 rounded-xl
                   shadow-[0_0_22px_rgba(245,158,11,0.22)]
                   transition
                 "
               >
-                {isSubmitting ? "Submitting..." : myBid ? "Update Offer" : "Submit Offer"}
+                {submitting ? "Submitting..." : "Submit Offer"}
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 text-[11px] text-white/55">
+          Request ID: <span className="text-white/80">{requestId}</span>
         </div>
       </div>
     </div>

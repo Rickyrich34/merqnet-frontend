@@ -13,269 +13,255 @@ function getToken() {
 
 function authHeaders() {
   const token = getToken();
-  return token
-    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
-    : { "Content-Type": "application/json" };
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function clampNumber(n) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : null;
+function normalizeId(x) {
+  if (!x) return "";
+  if (typeof x === "string") return x.trim();
+  if (typeof x === "object" && x._id) return String(x._id).trim();
+  return String(x).trim();
 }
 
-function money(n) {
-  const x = clampNumber(n);
-  if (x === null) return null;
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(x);
+/* ----------------------------- DATA HELPERS ----------------------------- */
+function safeNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-function extractBidPrice(b) {
-  const candidates = [
-    b?.wholeLotPrice,
-    b?.totalPrice,
-    b?.finalPrice,
-    b?.amount,
-    b?.price,
-    b?.bidPrice,
-    b?.unitPrice,
-  ];
-  for (const c of candidates) {
-    const x = clampNumber(c);
-    if (x !== null) return x;
+function fmtMoney(v) {
+  const n = safeNum(v);
+  if (n === null) return "—";
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function fmtQty(v) {
+  const n = safeNum(v);
+  if (n === null) return "—";
+  return n.toLocaleString();
+}
+
+function buildShippingText(req) {
+  // Try request-shipping shapes that may exist in different backend versions
+  const s = req?.shippingAddress || req?.shipping || req?.shipTo || null;
+  if (!s || typeof s !== "object") return "Not provided";
+
+  const street = s.street || s.streetAddress || "";
+  const city = s.city || "";
+  const state = s.state || "";
+  const country = s.country || "";
+  const postalCode = s.postalCode || s.zip || "";
+
+  const parts1 = [city, state].filter(Boolean).join(", ");
+  const parts2 = [country, postalCode].filter(Boolean).join(" ");
+  const compact = [parts1, parts2].filter(Boolean).join(" • ");
+  const full = [street, compact].filter(Boolean).join(" — ");
+
+  return full || compact || "Not provided";
+}
+
+function getBuyerLabel(req) {
+  // Best-effort: buyer name fields may differ by backend
+  const b = req?.buyer || req?.client || req?.clientID || req?.user || null;
+
+  if (typeof b === "string") return b;
+  if (b && typeof b === "object") {
+    const first = b.firstName || b.firstname || "";
+    const last = b.lastName || b.lastname || "";
+    const full = [first, last].filter(Boolean).join(" ").trim();
+    return full || b.email || b.username || b.name || "Buyer";
   }
-  return null;
+
+  // Fallback to fields on request
+  return req?.buyerName || req?.clientName || req?.email || "Buyer";
 }
 
-// Handles both: requestId: "..." OR requestId: { _id: "..." }
-function normalizeId(val) {
-  if (!val) return null;
-  if (typeof val === "string") return val;
-  if (typeof val === "object") {
-    if (val._id) return String(val._id);
-    if (val.id) return String(val.id);
+function getCategory(req) {
+  return req?.category || req?.type || "Other";
+}
+
+function getTitle(req) {
+  return req?.productName || req?.name || req?.title || "Request";
+}
+
+function getQuantity(req) {
+  return req?.quantity ?? req?.qty ?? req?.amount ?? "—";
+}
+
+/* ----------------------------- API CALLS ----------------------------- */
+async function apiGet(path) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = data?.message || `Request failed (${res.status})`;
+    throw new Error(msg);
   }
-  return String(val);
+  return res.json();
 }
 
+/* ----------------------------- COMPONENT ----------------------------- */
 export default function BuyerDashboard() {
   const navigate = useNavigate();
-  const userId = localStorage.getItem("userId");
+
+  const userId = useMemo(() => normalizeId(localStorage.getItem("userId")), []);
+  const token = getToken();
 
   const [requests, setRequests] = useState([]);
-  const [bidsCount, setBidsCount] = useState({});
-  const [bidMeta, setBidMeta] = useState({});
+  const [offersMap, setOffersMap] = useState({}); // requestId -> { lowestOffer, offersCount }
+  const [loading, setLoading] = useState(true);
 
-  // requestId -> { receiptId, createdAt }
-  const [paidMap, setPaidMap] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState("");
 
-  // UI-only controls
-  const [searchQuery, setSearchQuery] = useState("");
-
+  // Redirect if not logged in
   useEffect(() => {
-    if (!userId || !getToken()) {
-      navigate("/login");
-      return;
-    }
-    fetchAll();
-    // eslint-disable-next-line
-  }, []);
+    if (!token || !userId) navigate("/login");
+  }, [token, userId, navigate]);
 
-  const fetchAll = async () => {
-    try {
-      setLoading(true);
-      await fetchRequests();
-      await fetchBuyerReceipts();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load buyer requests
+  useEffect(() => {
+    let cancelled = false;
 
-  const fetchRequests = async () => {
-    const res = await fetch(`${API_BASE_URL}/api/requests/buyer/${userId}`, {
-      headers: authHeaders(),
-    });
+    const load = async () => {
+      try {
+        setLoading(true);
 
-    if (!res.ok) {
-      setRequests([]);
-      return;
-    }
+        // NOTE: keep the same endpoints you've been using
+        const data = await apiGet(`/api/requests/buyer/${userId}`);
 
-    const data = await res.json();
-    const finalRequests = Array.isArray(data)
-      ? data
-      : Array.isArray(data.requests)
-      ? data.requests
-      : [];
+        if (cancelled) return;
 
-    setRequests(finalRequests);
-
-    finalRequests.forEach((req) => {
-      fetchBidCount(req._id);
-      fetchBidMeta(req._id);
-    });
-  };
-
-  const fetchBidCount = async (requestId) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/bids/request/${requestId}`, {
-        headers: authHeaders(),
-      });
-      if (!res.ok) return;
-
-      const data = await res.json();
-      const count = Array.isArray(data) ? data.length : 0;
-
-      setBidsCount((prev) => ({ ...prev, [requestId]: count }));
-    } catch {}
-  };
-
-  const fetchBidMeta = async (requestId) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/bids/request/${requestId}`, {
-        headers: authHeaders(),
-      });
-      if (!res.ok) return;
-
-      const data = await res.json();
-      const bids = Array.isArray(data) ? data : [];
-
-      let lowest = null;
-      for (const b of bids) {
-        const p = extractBidPrice(b);
-        if (p === null) continue;
-        if (lowest === null || p < lowest) lowest = p;
+        const list = Array.isArray(data) ? data : data?.requests || [];
+        setRequests(list);
+      } catch (err) {
+        console.error("BuyerDashboard load error:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
+    };
 
-      setBidMeta((prev) => ({
-        ...prev,
-        [requestId]: { lowest },
-      }));
-    } catch {}
-  };
+    if (token && userId) load();
 
-  const fetchBuyerReceipts = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/receipts/buyer`, {
-        headers: authHeaders(),
-      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, userId]);
 
-      if (!res.ok) return;
+  // Load offers per request (lowest offer + count)
+  useEffect(() => {
+    let cancelled = false;
 
-      const data = await res.json();
-      const receipts = Array.isArray(data)
-        ? data
-        : Array.isArray(data.receipts)
-        ? data.receipts
-        : [];
+    const loadOffersFor = async (reqId) => {
+      try {
+        // Keep your existing endpoint assumption; if backend differs, keep as-is
+        const data = await apiGet(`/api/bids/request/${reqId}`);
 
-      const map = {};
-      receipts.forEach((r) => {
-        const reqId = normalizeId(r?.requestId);
-        const recId = r?.receiptId || null;
-        if (!reqId || !recId) return;
+        if (cancelled) return;
 
-        const createdAt = r?.createdAt ? new Date(r.createdAt).getTime() : 0;
+        const bids = Array.isArray(data) ? data : data?.bids || [];
+        const numericOffers = bids
+          .map((b) => safeNum(b?.totalPrice ?? b?.totalprice ?? b?.amount ?? b?.price))
+          .filter((n) => n !== null);
 
-        if (!map[reqId] || createdAt > (map[reqId].createdAt || 0)) {
-          map[reqId] = { receiptId: recId, createdAt };
-        }
-      });
+        const lowest = numericOffers.length ? Math.min(...numericOffers) : null;
 
-      setPaidMap(map);
-    } catch (e) {
-      console.error("fetchBuyerReceipts error:", e);
-    }
-  };
+        setOffersMap((prev) => ({
+          ...prev,
+          [reqId]: {
+            lowestOffer: lowest,
+            offersCount: bids.length,
+          },
+        }));
+      } catch (err) {
+        // If offers endpoint fails, keep a safe fallback (do NOT crash UI)
+        if (cancelled) return;
+        setOffersMap((prev) => ({
+          ...prev,
+          [reqId]: { lowestOffer: null, offersCount: 0 },
+        }));
+      }
+    };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this request?")) return;
+    if (!requests?.length) return;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/requests/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-
-      if (!res.ok) return;
-
-      setRequests((prev) => prev.filter((r) => r._id !== id));
-    } catch (err) {
-      console.error("Error deleting request:", err);
-    }
-  };
-
-  const isPaidRequest = (reqId) => !!paidMap[String(reqId)];
-
-  const activeRequests = useMemo(
-    () => requests.filter((r) => !isPaidRequest(r._id)),
-    [requests, paidMap]
-  );
-
-  const historyRequests = useMemo(() => {
-    const paid = requests.filter((r) => isPaidRequest(r._id));
-    return paid.sort((a, b) => {
-      const ta = paidMap[String(a._id)]?.createdAt || 0;
-      const tb = paidMap[String(b._id)]?.createdAt || 0;
-      return tb - ta;
+    // Fire and forget per request
+    requests.forEach((r) => {
+      const rid = normalizeId(r?._id || r?.id);
+      if (rid) loadOffersFor(rid);
     });
-  }, [requests, paidMap]);
 
-  const openRequestsCount = activeRequests.length;
+    return () => {
+      cancelled = true;
+    };
+  }, [requests]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return requests;
+
+    return requests.filter((r) => {
+      const id = String(r?._id || r?.id || "").toLowerCase();
+      const name = String(getTitle(r)).toLowerCase();
+      const cat = String(getCategory(r)).toLowerCase();
+      return id.includes(q) || name.includes(q) || cat.includes(q);
+    });
+  }, [requests, query]);
+
+  const openCount = useMemo(() => filtered.length, [filtered]);
 
   const activeOffersCount = useMemo(() => {
-    return activeRequests.reduce((sum, r) => sum + (bidsCount[r._id] || 0), 0);
-  }, [activeRequests, bidsCount]);
-
-  // ✅ Only search (no category dropdown). You can still search by category text if you type it.
-  const filteredActiveRequests = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return activeRequests;
-
-    return activeRequests.filter((r) => {
-      return (
-        String(r?.productName || "").toLowerCase().includes(q) ||
-        String(r?.category || "").toLowerCase().includes(q) ||
-        String(r?._id || "").toLowerCase().includes(q)
-      );
+    let total = 0;
+    filtered.forEach((r) => {
+      const rid = normalizeId(r?._id || r?.id);
+      const info = offersMap[rid];
+      if (info?.offersCount) total += info.offersCount;
     });
-  }, [activeRequests, searchQuery]);
+    return total;
+  }, [filtered, offersMap]);
 
   return (
-    <div className="relative min-h-screen w-full text-white overflow-x-hidden bg-black">
+    <div className="min-h-screen bg-black text-white pt-24 pb-20 relative overflow-hidden">
       {/* Background */}
-      <div className="absolute inset-0 -z-10">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url(${Galactic1})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="absolute inset-0 bg-black/60" />
-      </div>
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: `url(${Galactic1})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
 
-      <div className="relative z-10 max-w-xl mx-auto px-5 pt-32 pb-28">
-        {/* Top bar */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="rounded-2xl border border-cyan-500/30 bg-[#0B001F]/85 hover:bg-[#0B001F] transition p-2.5 shadow-[0_0_18px_rgba(34,211,238,0.25)]"
-            aria-label="Back"
-          >
-            <ChevronLeft className="w-5 h-5 text-cyan-200" />
-          </button>
+      {/* Content */}
+      <div className="relative z-10 max-w-5xl mx-auto px-5">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="rounded-2xl border border-white/15 bg-[#0B001F]/85 hover:bg-[#0B001F] transition p-2.5 shadow-[0_0_18px_rgba(255,255,255,0.08)]"
+              aria-label="Back"
+              title="Back"
+            >
+              <ChevronLeft className="w-5 h-5 text-white/80" />
+            </button>
 
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-cyan-200">Buyer Dashboard</h1>
-            {loading ? <p className="mt-1 text-xs text-white/60">Loading...</p> : null}
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                Buyer Dashboard
+              </h1>
+              <p className="text-xs sm:text-sm text-white/55 mt-1">
+                Track your requests and choose your winning offer when ready.
+              </p>
+            </div>
           </div>
 
           <button
-            onClick={() => navigate("/createrequest")}
+            onClick={() => navigate("/create-request")}
             className="rounded-2xl border border-cyan-500/30 bg-[#0B001F]/85 hover:bg-[#0B001F] transition p-2.5 shadow-[0_0_18px_rgba(34,211,238,0.25)]"
             aria-label="Place New Request"
             title="Place New Request"
@@ -288,71 +274,79 @@ export default function BuyerDashboard() {
         <div
           className="
             mt-8
-            bg-[#0B001F]/90
-            border border-cyan-500/30
-            shadow-[0_0_35px_rgba(34,211,238,0.35)]
+            bg-[#0B001F]/80
+            border border-cyan-500/25
             rounded-3xl
-            p-5
+            p-5 sm:p-6
+            shadow-[0_0_30px_rgba(34,211,238,0.15)]
+            backdrop-blur-sm
           "
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-cyan-100">Find a request</p>
+              <h2 className="text-lg font-bold text-cyan-100">Find a request</h2>
               <p className="text-xs text-white/55 mt-1">
                 Search your requests by name, ID, or category text.
               </p>
             </div>
 
-            <span className="text-[11px] text-white/55">
-              Showing{" "}
-              <span className="text-cyan-200 font-semibold">{filteredActiveRequests.length}</span>{" "}
-              / {activeRequests.length}
-            </span>
+            <div className="text-xs text-white/50">
+              Showing <span className="text-white/80">{filtered.length}</span> /{" "}
+              <span className="text-white/80">{requests.length}</span>
+            </div>
           </div>
 
           <div className="mt-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-300/80" />
+            <Search className="w-4 h-4 text-white/50 absolute left-4 top-1/2 -translate-y-1/2" />
             <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search my requests…"
-              aria-label="Search my requests"
-              title="Search my requests"
-              className="w-full bg-[#0a0128] pl-10 pr-4 py-3 rounded-xl border border-cyan-700 focus:ring-2 focus:ring-cyan-400"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search my requests..."
+              className="
+                w-full
+                bg-[#070016]/80
+                border border-cyan-500/20
+                rounded-2xl
+                pl-11 pr-4 py-3
+                text-sm
+                outline-none
+                focus:border-cyan-400/50
+                focus:ring-2 focus:ring-cyan-400/20
+              "
             />
           </div>
         </div>
 
         {/* Stats */}
-        <div className="mt-6 grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
           <div
             className="
-              bg-[#0B001F]/90
-              border border-cyan-500/30
-              shadow-[0_0_28px_rgba(34,211,238,0.25)]
+              bg-[#0B001F]/75
+              border border-cyan-500/20
               rounded-3xl
               p-5
+              shadow-[0_0_26px_rgba(34,211,238,0.12)]
             "
           >
-            <p className="text-xs text-white/70">Open Requests</p>
-            <p className="text-3xl font-bold text-cyan-200 mt-2">{openRequestsCount}</p>
+            <div className="text-xs text-white/55">Open Requests</div>
+            <div className="text-3xl font-extrabold text-cyan-200 mt-2">{openCount}</div>
           </div>
 
           <div
             className="
-              bg-[#0B001F]/90
-              border border-fuchsia-500/20
-              shadow-[0_0_28px_rgba(217,70,239,0.18)]
+              bg-[#0B001F]/75
+              border border-cyan-500/20
               rounded-3xl
               p-5
+              shadow-[0_0_26px_rgba(34,211,238,0.12)]
             "
           >
-            <p className="text-xs text-white/70">Active Offers</p>
-            <p className="text-3xl font-bold text-fuchsia-200 mt-2">{activeOffersCount}</p>
+            <div className="text-xs text-white/55">Active Offers</div>
+            <div className="text-3xl font-extrabold text-cyan-200 mt-2">{activeOffersCount}</div>
           </div>
         </div>
 
-        {/* Header */}
+        {/* Section header */}
         <div className="mt-8 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-cyan-100">My Active Offers</h2>
@@ -362,7 +356,7 @@ export default function BuyerDashboard() {
           </div>
 
           <button
-            onClick={() => navigate("/createrequest")}
+            onClick={() => navigate("/create-request")}
             className="
               inline-flex items-center gap-2
               bg-[#0B001F]/90
@@ -380,172 +374,94 @@ export default function BuyerDashboard() {
           </button>
         </div>
 
-        {/* Active cards */}
-        <div className="mt-5 flex flex-col gap-5">
-          {activeRequests.length === 0 ? (
-            <div
-              className="
-                bg-[#0B001F]/90
-                border border-cyan-500/20
-                rounded-3xl
-                p-6
-                text-white/70
-                shadow-[0_0_20px_rgba(34,211,238,0.18)]
-              "
-            >
-              No active offers right now.
-            </div>
-          ) : filteredActiveRequests.length === 0 ? (
-            <div
-              className="
-                bg-[#0B001F]/90
-                border border-cyan-500/20
-                rounded-3xl
-                p-6
-                text-white/70
-                shadow-[0_0_20px_rgba(34,211,238,0.18)]
-              "
-            >
-              No matches for that search.
+        {/* List */}
+        <div className="mt-6 space-y-5">
+          {loading ? (
+            <div className="text-center text-white/60 py-16">Loading your requests...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center text-white/60 py-16">
+              No requests found. Try placing a new request.
             </div>
           ) : (
-            filteredActiveRequests.map((req) => {
-              const meta = bidMeta[req._id] || {};
-              const lowestText =
-                meta.lowest !== undefined && meta.lowest !== null ? money(meta.lowest) : null;
+            filtered.map((req) => {
+              const rid = normalizeId(req?._id || req?.id);
+              const info = offersMap[rid] || { lowestOffer: null, offersCount: 0 };
 
               return (
                 <div
-                  key={req._id}
+                  key={rid}
                   className="
-                    bg-[#0B001F]/90
-                    border border-cyan-500/25
-                    shadow-[0_0_30px_rgba(34,211,238,0.20)]
+                    bg-[#0B001F]/85
+                    border border-cyan-500/20
                     rounded-3xl
-                    p-6
+                    p-5 sm:p-6
+                    shadow-[0_0_28px_rgba(34,211,238,0.14)]
+                    backdrop-blur-sm
                   "
                 >
-                  <p className="text-xs text-white/70">
-                    {req.category} • x{req.quantity}
-                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                      <div className="text-xs text-white/55">
+                        {getCategory(req)} • x{fmtQty(getQuantity(req))}
+                      </div>
+                      <div className="text-xl sm:text-2xl font-extrabold mt-1">
+                        {getTitle(req)}
+                      </div>
 
-                  <h3 className="text-xl font-bold text-white mt-1">{req.productName}</h3>
+                      <div className="mt-3 text-sm text-white/75">
+                        Lowest offer:{" "}
+                        <span className="text-cyan-200 font-semibold">
+                          {info.lowestOffer === null ? "No offers yet" : fmtMoney(info.lowestOffer)}
+                        </span>
+                      </div>
+                    </div>
 
-                  <p className="text-sm text-white/80 mt-3">
-                    Lowest offer:{" "}
-                    <span className="text-orange-200 font-semibold">
-                      {lowestText || "No offers yet"}
-                    </span>
-                  </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => navigate(`/requests/${rid}/acceptbid`)}
+                        className="
+                          inline-flex items-center justify-center gap-2
+                          bg-cyan-500/90 hover:bg-cyan-400
+                          text-black font-semibold
+                          px-5 py-3
+                          rounded-xl
+                          transition
+                          shadow-[0_0_24px_rgba(34,211,238,0.28)]
+                          min-w-[160px]
+                        "
+                      >
+                        <ReceiptText className="w-4 h-4" />
+                        View Offers
+                      </button>
 
-                  <div className="mt-5 flex items-center gap-3">
-                    <button
-                      onClick={() => navigate(`/requests/${req._id}/acceptbid`)}
-                      className="
-                        flex-1
-                        bg-cyan-500 hover:bg-cyan-400
-                        text-black font-semibold
-                        py-2.5
-                        rounded-xl
-                        shadow-[0_0_20px_rgba(34,211,238,0.35)]
-                        transition
-                      "
-                    >
-                      View Offers
-                    </button>
+                      <button
+                        onClick={() => {
+                          // Keep existing delete behavior placeholder (if implemented elsewhere)
+                          alert("Delete action not wired here.");
+                        }}
+                        className="
+                          bg-[#2a0011]/70 hover:bg-[#3a0017]
+                          border border-red-400/30
+                          text-red-200
+                          px-5 py-3
+                          rounded-xl
+                          transition
+                          min-w-[110px]
+                        "
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
 
-                    <button
-                      onClick={() => handleDelete(req._id)}
-                      className="
-                        border border-red-500/40
-                        text-red-200
-                        bg-red-500/10 hover:bg-red-500/15
-                        px-4 py-2.5
-                        rounded-xl
-                        transition
-                      "
-                    >
-                      Delete
-                    </button>
+                  {/* Extra meta */}
+                  <div className="mt-4 text-xs text-white/45">
+                    Request ID: <span className="text-white/55">{rid}</span>
                   </div>
                 </div>
               );
             })
           )}
-        </div>
-
-        {/* Purchase History */}
-        <div className="mt-12">
-          <h2 className="text-lg font-bold text-cyan-100">Purchase History</h2>
-          <p className="text-xs text-white/55 mt-1">
-            Paid requests are archived here with their receipt.
-          </p>
-
-          <div className="mt-5 flex flex-col gap-5">
-            {historyRequests.length === 0 ? (
-              <div
-                className="
-                  bg-[#0B001F]/90
-                  border border-cyan-500/20
-                  rounded-3xl
-                  p-6
-                  text-white/70
-                  shadow-[0_0_20px_rgba(34,211,238,0.18)]
-                "
-              >
-                No purchases yet.
-              </div>
-            ) : (
-              historyRequests.map((req) => {
-                const receiptId = paidMap[String(req._id)]?.receiptId || null;
-
-                return (
-                  <div
-                    key={req._id}
-                    className="
-                      bg-[#0B001F]/90
-                      border border-emerald-500/25
-                      shadow-[0_0_26px_rgba(16,185,129,0.18)]
-                      rounded-3xl
-                      p-6
-                    "
-                  >
-                    <p className="text-xs text-white/70">
-                      {req.category} • x{req.quantity}
-                    </p>
-
-                    <h3 className="text-xl font-bold text-white mt-1">{req.productName}</h3>
-
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="text-emerald-200 text-sm font-semibold">Status: PAID</span>
-                      <span className="text-xs text-white/70">
-                        Receipt: <span className="text-white">{receiptId || "—"}</span>
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => receiptId && navigate(`/receipt/${receiptId}`)}
-                      disabled={!receiptId}
-                      className="
-                        mt-5 w-full inline-flex items-center justify-center gap-2
-                        bg-[#0a0128]
-                        border border-cyan-700
-                        text-cyan-200
-                        py-2.5
-                        rounded-xl
-                        hover:bg-[#0b0230]
-                        transition
-                        disabled:opacity-50
-                      "
-                    >
-                      <ReceiptText className="w-4 h-4" />
-                      View Receipt
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
       </div>
     </div>

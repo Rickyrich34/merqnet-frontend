@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
-const API = "import.meta.env.VITE_API_URL";
+const API = import.meta.env.VITE_API_URL;
 
 function getToken() {
   return localStorage.getItem("userToken") || localStorage.getItem("token") || "";

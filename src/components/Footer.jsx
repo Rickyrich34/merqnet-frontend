@@ -2,8 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 const Footer = () => {
-  const userEmail = localStorage.getItem("userEmail");
-
   const token =
     localStorage.getItem("userToken") || localStorage.getItem("token");
 
@@ -36,12 +34,6 @@ const Footer = () => {
             >
               Login
             </Link>
-          )}
-
-          {token && (
-            <span className="text-gray-300">
-              {userEmail}
-            </span>
           )}
 
           <Link

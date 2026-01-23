@@ -135,7 +135,7 @@ const EditProfile = () => {
         }
       );
 
-      navigate("/profile");
+      navigate("/editprofile");
     } catch (error) {
       console.error("Error guardando cambios:", error);
     }

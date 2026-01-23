@@ -66,6 +66,21 @@ function formatShipping(addr) {
   return full || compact || null;
 }
 
+// ✅ Convert "5 days" or "3-5 business days" -> 5
+function deliveryTimeToDays(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return null;
+
+  const nums = raw.match(/\d+(\.\d+)?/g);
+  if (!nums || !nums.length) return null;
+
+  // take the max number found (e.g., "3-5" => 5)
+  const values = nums.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+  if (!values.length) return null;
+
+  return Math.max(...values);
+}
+
 export default function SubmitBid() {
   const { requestId } = useParams();
   const navigate = useNavigate();
@@ -85,6 +100,8 @@ export default function SubmitBid() {
   const [myBid, setMyBid] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
   const [showAdvanced, setShowAdvanced] = useState(true);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -176,17 +193,30 @@ export default function SubmitBid() {
   };
 
   const submitBid = async () => {
-    if (!unitPrice || !totalPrice) {
-      alert("Enter Unit Price and Total Lot Price.");
+    if (isSubmitting) return;
+
+    if (!sellerId) {
+      alert("Missing sellerId. Please log out and log in again.");
       return;
     }
 
-    if (!deliveryTime) {
-      alert("Delivery Time is required.");
+    const u = Number(unitPrice);
+    const t = Number(totalPrice);
+
+    if (!Number.isFinite(u) || u <= 0 || !Number.isFinite(t) || t <= 0) {
+      alert("Enter valid Unit Price and Total Lot Price (numbers only).");
+      return;
+    }
+
+    const deliveryDays = deliveryTimeToDays(deliveryTime);
+    if (!deliveryDays || !Number.isFinite(deliveryDays) || deliveryDays <= 0) {
+      alert("Delivery Time must include a valid number of days (e.g. 5 or 3-5 days).");
       return;
     }
 
     try {
+      setIsSubmitting(true);
+
       const isUpdate = !!myBid;
 
       let imagesToSend = [];
@@ -199,14 +229,14 @@ export default function SubmitBid() {
       }
 
       const payload = {
+        requestId,
         sellerId,
-        unitPrice: Number(unitPrice),
-        totalPrice: Number(totalPrice),
-        deliveryTime,
+        unitPrice: u,
+        totalPrice: t,
+        deliveryTime: deliveryDays, // ✅ send NUMBER of days
         images: imagesToSend,
       };
 
-      // ✅ POST with axios timeout
       const postRes = await http.post(`${API_BASE_URL}/api/bids/request/${requestId}`, payload, {
         headers: authHeaders({ "Content-Type": "application/json" }),
       });
@@ -219,11 +249,21 @@ export default function SubmitBid() {
       alert(isUpdate ? "Offer updated successfully!" : "Bid submitted successfully!");
       navigate("/seller-dashboard");
     } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        (e?.code === "ECONNABORTED" ? "Server timeout submitting bid. Try again." : "Error submitting bid. Try again.");
-      alert(msg);
+      const status = e?.response?.status;
+      const serverMsg = e?.response?.data?.message || e?.response?.data?.error;
+
+      if (status === 400 && !serverMsg) {
+        alert("Bad Request (400). Backend rejected the bid payload. Check required fields/types (deliveryTime must be a number of days).");
+      } else {
+        const msg =
+          serverMsg ||
+          (e?.code === "ECONNABORTED"
+            ? "Server timeout submitting bid. Try again."
+            : "Error submitting bid. Try again.");
+        alert(msg);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -410,13 +450,13 @@ export default function SubmitBid() {
               <div>
                 <label className="text-xs text-white/70 flex items-center gap-2 mb-2">
                   <Truck className="w-4 h-4 text-cyan-200" />
-                  Delivery Time
+                  Delivery Time (days)
                 </label>
                 <input
                   className={inputBase}
                   value={deliveryTime}
                   onChange={(e) => setDeliveryTime(e.target.value)}
-                  placeholder="e.g. 3-5 business days"
+                  placeholder="e.g. 5 or 3-5 days"
                 />
               </div>
 
@@ -472,10 +512,12 @@ export default function SubmitBid() {
 
               <button
                 onClick={submitBid}
+                disabled={isSubmitting}
                 className="
                   mt-2
                   w-full
                   bg-amber-400 hover:bg-amber-300
+                  disabled:opacity-60 disabled:cursor-not-allowed
                   text-black font-semibold
                   py-3
                   rounded-xl
@@ -483,7 +525,7 @@ export default function SubmitBid() {
                   transition
                 "
               >
-                {myBid ? "Update Offer" : "Submit Offer"}
+                {isSubmitting ? "Submitting..." : myBid ? "Update Offer" : "Submit Offer"}
               </button>
             </div>
           </div>

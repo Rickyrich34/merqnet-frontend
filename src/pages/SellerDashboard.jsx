@@ -15,7 +15,9 @@ import {
 
 import Galactic1 from "../assets/Galactic1.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// ✅ FIX: support both env var names (Railway / older local setups)
+// Keep original line concept, just make it safe:
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 const CATEGORY_OPTIONS = [
   "All Categories",

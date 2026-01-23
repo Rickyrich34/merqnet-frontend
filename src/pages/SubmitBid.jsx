@@ -14,6 +14,7 @@ import {
   Briefcase,
   PencilLine,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 
 import logopic2 from "../assets/logopic2.png";
@@ -59,8 +60,56 @@ function formatShipping(addr) {
   return full || compact || null;
 }
 
+/**
+ * ✅ Defensive "closed request" detector.
+ * Works even if backend uses different names.
+ */
+function isRequestClosed(req) {
+  if (!req || typeof req !== "object") return false;
+
+  const status = String(req.status || req.requestStatus || req.state || "").toLowerCase();
+
+  if (
+    status.includes("closed") ||
+    status.includes("completed") ||
+    status.includes("complete") ||
+    status.includes("accepted") ||
+    status.includes("awarded") ||
+    status.includes("winner") ||
+    status.includes("paid") ||
+    status.includes("fulfilled") ||
+    status.includes("done")
+  ) {
+    return true;
+  }
+
+  // common boolean flags
+  if (req.isClosed === true || req.closed === true || req.isComplete === true || req.completed === true) {
+    return true;
+  }
+
+  // common "winner/accepted" pointers
+  if (
+    req.acceptedBidId ||
+    req.acceptedBid ||
+    req.winningBidId ||
+    req.winningBid ||
+    req.selectedBidId ||
+    req.selectedBid ||
+    req.chosenBidId ||
+    req.chosenBid ||
+    req.winnerBidId ||
+    req.winnerBid ||
+    req.paymentIntentId ||
+    req.receiptId
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function SubmitBid() {
-  // ✅ FIX: App route is /submit-bid/:requestId so params key is requestId
   const { requestId } = useParams();
   const navigate = useNavigate();
 
@@ -68,6 +117,9 @@ export default function SubmitBid() {
 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // ✅ NEW: closed guard state
+  const [requestClosed, setRequestClosed] = useState(false);
 
   // Pricing (always editable)
   const [unitPrice, setUnitPrice] = useState("");
@@ -112,15 +164,26 @@ export default function SubmitBid() {
 
       if (!res.ok) {
         setRequest(null);
+        setRequestClosed(false);
         return;
       }
 
       const reqData = await res.json();
       setRequest(reqData);
 
+      // ✅ NEW: detect closed/accepted request
+      const closed = isRequestClosed(reqData);
+      setRequestClosed(closed);
+
+      // If closed, don't even bother loading bids for editing/submitting
+      if (closed) {
+        setMyBid(null);
+        setExistingImages([]);
+        setShowAdvanced(false);
+        return;
+      }
+
       // 2) Load bids for this request and find current seller’s bid (if any)
-      // This endpoint already exists in your older version and backend flow.
-      // If it doesn't exist, it will fail silently and we treat as first bid.
       try {
         const bidRes = await fetch(`${API_BASE_URL}/api/bids/request/${requestId}`, {
           headers: authHeaders(),
@@ -169,6 +232,7 @@ export default function SubmitBid() {
       setMyBid(null);
       setExistingImages([]);
       setShowAdvanced(true);
+      setRequestClosed(false);
     } finally {
       setLoading(false);
     }
@@ -192,6 +256,13 @@ export default function SubmitBid() {
   };
 
   const submitBid = async () => {
+    // ✅ NEW: hard stop if request is closed
+    if (requestClosed) {
+      alert("This request is closed. The buyer already selected a winner.");
+      navigate("/seller-dashboard");
+      return;
+    }
+
     // Always require pricing
     if (!unitPrice || !totalPrice) {
       alert("Enter Unit Price and Total Lot Price.");
@@ -201,20 +272,14 @@ export default function SubmitBid() {
     const isUpdate = !!myBid;
 
     // Delivery time rule:
-    // - first bid: required
-    // - update: keep existing, but still should not be empty (prefilled)
     if (!deliveryTime) {
       alert("Delivery Time is required.");
       return;
     }
 
     try {
-      // Images rule:
-      // - first bid: optional (your UI says optional)
-      // - update: keep existing unless user uploads new ones (or explicitly clears)
       let imagesToSend = [];
 
-      // If user selected NEW photos, those override existing
       if (photos.length) {
         imagesToSend = await Promise.all(photos.map(fileToBase64));
       } else if (isUpdate && existingImages.length) {
@@ -245,7 +310,6 @@ export default function SubmitBid() {
       }
 
       alert(isUpdate ? "Offer updated successfully!" : "Bid submitted successfully!");
-      // ✅ FIX: route in App.jsx is /seller-dashboard
       navigate("/seller-dashboard");
     } catch {
       alert("Server error submitting bid.");
@@ -268,9 +332,69 @@ export default function SubmitBid() {
     );
   }
 
+  // ✅ NEW: Closed screen (no offer allowed)
+  if (requestClosed) {
+    return (
+      <div className="relative min-h-screen w-full text-white overflow-x-hidden bg-black">
+        <div className="absolute inset-0 -z-10">
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${Galactic1})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+          />
+          <div className="absolute inset-0 bg-black/65" />
+        </div>
+
+        <div className="relative z-10 max-w-xl mx-auto pt-44 px-6 pb-24">
+          <div className="rounded-3xl border border-white/15 bg-[#0B001F]/82 backdrop-blur-md shadow-[0_18px_70px_rgba(0,0,0,0.65)] p-8 text-center">
+            <div className="flex items-center justify-center gap-3">
+              <Lock className="w-6 h-6 text-amber-200" />
+              <h1 className="text-[22px] font-semibold text-white/95">Request Closed</h1>
+            </div>
+
+            <p className="mt-3 text-sm text-white/80">
+              This request is no longer accepting offers. The buyer already selected a winner.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                onClick={() => navigate("/seller-dashboard")}
+                className="
+                  w-full
+                  rounded-2xl
+                  bg-amber-400 hover:bg-amber-300
+                  text-black font-semibold
+                  py-3
+                  shadow-[0_0_22px_rgba(245,158,11,0.20)]
+                  transition
+                "
+              >
+                Back to Seller Dashboard
+              </button>
+
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="w-full text-xs text-white/70 hover:text-white transition"
+              >
+                Go to Main Dashboard
+              </button>
+            </div>
+
+            <div className="mt-6 text-[11px] text-white/50">
+              Request ID: <span className="text-white/75">{request?._id}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const shipText = formatShipping(request?.shippingAddress);
 
-  // Reusable styles (UI only)
   const fieldCard = "rounded-2xl border border-white/12 bg-[#0a0128]/55 p-4";
   const inputBase =
     "w-full rounded-xl bg-black/55 border border-white/25 px-3 py-2.5 text-sm text-white/90 outline-none " +
@@ -303,7 +427,6 @@ export default function SubmitBid() {
       <div className="relative z-10 max-w-5xl mx-auto pt-44 px-6 pb-24">
         {/* Back */}
         <button
-          // ✅ FIX: route in App.jsx is /seller-dashboard
           onClick={() => navigate("/seller-dashboard")}
           className="
             rounded-2xl
@@ -452,7 +575,6 @@ export default function SubmitBid() {
               <div className="mt-3 h-px bg-white/10" />
 
               <div className="mt-4 space-y-3">
-                {/* Always shown */}
                 <div className={fieldCard}>
                   <label className="flex items-center gap-2 text-xs text-white/75 mb-2">
                     <DollarSign className="w-4 h-4 text-cyan-200" />
@@ -481,7 +603,6 @@ export default function SubmitBid() {
                   />
                 </div>
 
-                {/* If updating and advanced collapsed, show summary */}
                 {myBid && !showAdvanced ? (
                   <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
                     <div className="text-xs text-white/70">
@@ -502,7 +623,6 @@ export default function SubmitBid() {
                   </div>
                 ) : null}
 
-                {/* Advanced fields (always for first bid, optional for updates) */}
                 {(!myBid || showAdvanced) && (
                   <>
                     <div className={fieldCard}>
@@ -544,7 +664,6 @@ export default function SubmitBid() {
                         </label>
                       </div>
 
-                      {/* Existing images (from previous bid) */}
                       {existingImages.length > 0 && photos.length === 0 ? (
                         <div className="mt-3">
                           <div className="flex items-center justify-between">
@@ -579,7 +698,6 @@ export default function SubmitBid() {
                         </div>
                       ) : null}
 
-                      {/* New photos selected this time */}
                       {photoPreviews.length > 0 ? (
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           {photoPreviews.map((src, idx) => (
@@ -625,7 +743,6 @@ export default function SubmitBid() {
                 </button>
 
                 <button
-                  // ✅ FIX: route in App.jsx is /seller-dashboard
                   onClick={() => navigate("/seller-dashboard")}
                   className="w-full text-xs text-white/70 hover:text-white transition"
                 >

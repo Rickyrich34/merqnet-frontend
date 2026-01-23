@@ -1,4 +1,3 @@
-// src/pages/MainDashboard.jsx
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ShoppingCart, Tag, Star, MapPin } from "lucide-react";
@@ -335,21 +334,27 @@ const MainDashboard = () => {
     );
   };
 
+  // 🔧 ONLY THIS COMPONENT WAS MODIFIED (arcade joystick style)
   const ActionButton = ({ label, icon: Icon, onClick, badgeCount, tintClass }) => {
     return (
-      <button
-        onClick={onClick}
-        className={`relative w-full sm:w-[220px] px-7 py-4 rounded-full font-semibold text-white flex items-center justify-center gap-2
-          bg-gradient-to-r ${tintClass}
-          border border-white/10
-          shadow-[0_0_28px_rgba(180,60,255,0.35)]
-          hover:brightness-110 hover:shadow-[0_0_36px_rgba(160,90,255,0.55)]
-          active:scale-[0.99] transition`}
-      >
-        <Icon size={18} className="drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" />
-        {label}
-        <Badge count={badgeCount} />
-      </button>
+      <div className="relative">
+        {/* base */}
+        <div className="absolute inset-x-3 top-5 h-full rounded-full bg-black/60 blur-sm" />
+
+        <button
+          onClick={onClick}
+          className={`relative z-10 w-full sm:w-[220px] px-7 py-4 rounded-full font-semibold text-white flex items-center justify-center gap-2
+            bg-gradient-to-b ${tintClass}
+            border border-white/20
+            shadow-[0_8px_0_rgba(0,0,0,0.55),0_0_28px_rgba(180,60,255,0.45)]
+            hover:brightness-110 hover:shadow-[0_8px_0_rgba(0,0,0,0.55),0_0_36px_rgba(160,90,255,0.65)]
+            active:translate-y-[6px] active:shadow-[0_2px_0_rgba(0,0,0,0.65)] transition`}
+        >
+          <Icon size={18} className="drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" />
+          {label}
+          <Badge count={badgeCount} />
+        </button>
+      </div>
     );
   };
 

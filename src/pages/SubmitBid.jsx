@@ -16,7 +16,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-
 import Galactic1 from "../assets/Galactic1.png";
 
 // ✅ Keep your env fallback (works on Railway + local) — matches SellerDashboard approach
@@ -348,6 +347,8 @@ export default function SubmitBid() {
             <ChevronLeft className="w-5 h-5 text-cyan-200" />
           </button>
 
+          <div className="flex items-center gap-3">
+            <div>
               <div className="flex items-center gap-2 text-xs text-white/70">
                 <Briefcase className="w-4 h-4 text-amber-200" />
                 <span>MerqNet</span>

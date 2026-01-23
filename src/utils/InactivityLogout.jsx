@@ -1,11 +1,19 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-const InactivityLogout = ({ timeout }) => {
+const InactivityLogout = ({ timeout = 15 * 60 * 1000 }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
     let timer;
+
+    const logout = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("userToken");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
+      navigate("/login");
+    };
 
     const resetTimer = () => {
       clearTimeout(timer);
@@ -14,31 +22,25 @@ const InactivityLogout = ({ timeout }) => {
         const token =
           localStorage.getItem("userToken") || localStorage.getItem("token");
 
-        if (!token) {
-          // ❗ No borres TODO el storage
-          localStorage.removeItem("token");
-          localStorage.removeItem("userToken");
-          localStorage.removeItem("userId");
-          localStorage.removeItem("userEmail");
-
-          navigate("/login");
+        if (token) {
+          logout();
         }
       }, timeout);
     };
 
-    window.onload = resetTimer;
-    window.onmousemove = resetTimer;
-    window.onkeypress = resetTimer;
-    window.onscroll = resetTimer;
+    const events = ["load", "mousemove", "keydown", "scroll", "click"];
+
+    events.forEach((event) =>
+      window.addEventListener(event, resetTimer)
+    );
 
     resetTimer();
 
     return () => {
       clearTimeout(timer);
-      window.onload = null;
-      window.onmousemove = null;
-      window.onkeypress = null;
-      window.onscroll = null;
+      events.forEach((event) =>
+        window.removeEventListener(event, resetTimer)
+      );
     };
   }, [timeout, navigate]);
 

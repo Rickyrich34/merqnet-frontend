@@ -85,8 +85,10 @@ function App() {
         <Route path="/seller-products" element={<SellerProducts />} />
         <Route path="/seller-bids" element={<SellerBids />} />
 
-        {/* PAYMENTS */}
-        <Route path="/payment-methods" element={<PaymentMethods />} />
+         {/* PAYMENTS */}
+        <Route path="/paymentmethods" element={<PaymentMethods />} />
+        <Route path="/payment/:bidId" element={<PaymentMethods />} />
+
 
         {/* PROFILE */}
         <Route path="/profile" element={<ProfileView />} />

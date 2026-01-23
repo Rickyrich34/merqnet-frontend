@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import RatingModal from "../components/RatingModal";
 
-const API_BASE = "import.meta.env.VITE_API_URL";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 function getToken() {
   return (

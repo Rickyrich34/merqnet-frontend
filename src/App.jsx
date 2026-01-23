@@ -66,6 +66,9 @@ function App() {
         <Route path="/submit-bid/:requestId" element={<SubmitBid />} />
         <Route path="/accept-bid/:bidId" element={<AcceptBid />} />
 
+        {/* ✅ FIX: route used by BuyerDashboard View Offers button */}
+        <Route path="/requests/:requestId/acceptbid" element={<AcceptBid />} />
+
         {/* MESSAGE THREADS / Q&A */}
         <Route path="/answer-back/:threadId" element={<AnswerBack />} />
         <Route path="/seller-answer/:threadId" element={<SellerAnswer />} />

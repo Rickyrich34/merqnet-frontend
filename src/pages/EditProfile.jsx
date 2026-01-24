@@ -49,12 +49,9 @@ export default function EditProfile() {
 
     const fetchUser = async () => {
       try {
-        const res = await axios.get(
-          `${API}/api/users/profile/${userId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axios.get(`${API}/api/users/profile/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         const user = res.data;
 
@@ -74,7 +71,7 @@ export default function EditProfile() {
     };
 
     fetchUser();
-  }, []);
+  }, [token, userId, navigate]);
 
   /* ================================
      Handlers
@@ -155,9 +152,7 @@ export default function EditProfile() {
       navigate("/profile");
     } catch (err) {
       console.error("EditProfile save error:", err);
-      setError(
-        err?.response?.data?.message || "Failed to update profile."
-      );
+      setError(err?.response?.data?.message || "Failed to update profile.");
     }
   };
 
@@ -252,47 +247,47 @@ export default function EditProfile() {
             >
               <div className="flex justify-between items-center">
                 <strong>Address {i + 1}</strong>
-                <label className="text-sm">
+                <label className="text-sm flex items-center gap-2">
                   <input
                     type="radio"
-                    checked={addr.isDefault}
+                    checked={!!addr.isDefault}
                     onChange={() => setDefaultAddress(i)}
-                  />{" "}
+                  />
                   Default
                 </label>
               </div>
 
               <input
                 name="streetAddress"
-                value={addr.streetAddress}
+                value={addr.streetAddress || ""}
                 onChange={(e) => handleAddressChange(i, e)}
                 placeholder="Street"
                 className="w-full p-2 rounded bg-[#111]"
               />
               <input
                 name="city"
-                value={addr.city}
+                value={addr.city || ""}
                 onChange={(e) => handleAddressChange(i, e)}
                 placeholder="City"
                 className="w-full p-2 rounded bg-[#111]"
               />
               <input
                 name="state"
-                value={addr.state}
+                value={addr.state || ""}
                 onChange={(e) => handleAddressChange(i, e)}
                 placeholder="State"
                 className="w-full p-2 rounded bg-[#111]"
               />
               <input
                 name="country"
-                value={addr.country}
+                value={addr.country || ""}
                 onChange={(e) => handleAddressChange(i, e)}
                 placeholder="Country"
                 className="w-full p-2 rounded bg-[#111]"
               />
               <input
                 name="postalCode"
-                value={addr.postalCode}
+                value={addr.postalCode || ""}
                 onChange={(e) => handleAddressChange(i, e)}
                 placeholder="Postal code"
                 className="w-full p-2 rounded bg-[#111]"
@@ -301,10 +296,19 @@ export default function EditProfile() {
           ))}
         </div>
 
-        <div className="flex gap-4 pt-4">
+        {/* ✅ Payment Methods button (always navigates) */}
+        <button
+          type="button"
+          onClick={() => navigate("/paymentmethods")}
+          className="w-full bg-cyan-600 hover:bg-cyan-500 transition p-3 rounded font-bold"
+        >
+          Manage Payment Methods
+        </button>
+
+        <div className="flex gap-4 pt-2">
           <button
             type="submit"
-            className="flex-1 bg-purple-600 p-3 rounded font-bold"
+            className="flex-1 bg-purple-600 hover:bg-purple-500 transition p-3 rounded font-bold"
           >
             Save changes
           </button>
@@ -312,7 +316,7 @@ export default function EditProfile() {
           <button
             type="button"
             onClick={() => navigate("/profile")}
-            className="flex-1 bg-gray-700 p-3 rounded"
+            className="flex-1 bg-gray-700 hover:bg-gray-600 transition p-3 rounded"
           >
             Cancel
           </button>

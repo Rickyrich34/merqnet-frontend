@@ -75,23 +75,23 @@ const Navbar = () => {
       data-navbar="merqnet"
       className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md border-b border-white/10"
     >
-      <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
+      <div className="flex justify-between items-center px-4 sm:px-10 py-3 sm:py-4">
         {/* Left: Logo + Title + Email */}
         <div className="flex items-center gap-3 min-w-0">
           <Link
             to={isLoggedIn ? "/dashboard" : "/"}
             className="flex items-center gap-3 min-w-0"
           >
-            {/* Dog logo */}
+            {/* BIG Dog logo */}
             <div className="relative shrink-0 flex items-center">
               <img
                 src={logopic2}
                 alt="MerqNet"
                 className="
-                  w-11 h-11 sm:w-12 sm:h-12
+                  w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24
                   object-contain
                   brightness-110 contrast-140 saturate-110
-                  drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]
+                  drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)]
                 "
               />
             </div>

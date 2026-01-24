@@ -34,9 +34,6 @@ export default function EditProfile() {
     shippingAddresses: [],
   });
 
-  /* ================================
-     Load user
-  ================================== */
   useEffect(() => {
     if (!token || !userId) {
       setLoading(false);
@@ -70,9 +67,6 @@ export default function EditProfile() {
     fetchUser();
   }, [token, userId, navigate]);
 
-  /* ================================
-     Handlers
-  ================================== */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -153,9 +147,6 @@ export default function EditProfile() {
     }
   };
 
-  /* ================================
-     UI states
-  ================================== */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -178,9 +169,6 @@ export default function EditProfile() {
     );
   }
 
-  /* ================================
-     Button styles
-  ================================== */
   const baseBtn =
     "relative inline-flex items-center justify-center select-none rounded-xl font-extrabold tracking-wide transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-cyan-400/60";
 
@@ -196,23 +184,24 @@ export default function EditProfile() {
     baseBtn +
     " w-full py-3 text-white/90 bg-white/5 hover:bg-white/10 border border-white/10";
 
-  /* ================================
-     Render
-  ================================== */
   return (
     <div className="min-h-screen pt-24 pb-32 px-4 text-white bg-black flex justify-center">
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-xl bg-black/70 p-8 rounded-2xl shadow-xl space-y-6"
       >
-        {/* ✅ Back arrow restored */}
+        {/* Back arrow icon only */}
         <button
           type="button"
           onClick={() => navigate("/profile")}
-          className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-bold mb-1 transition"
+          aria-label="Back"
+          className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full
+                     bg-white/5 border border-white/10 text-white
+                     hover:bg-white/10 hover:border-white/20 transition
+                     shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_25px_rgba(0,0,0,0.55)]
+                     active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
         >
-          <span className="text-xl">←</span>
-          Back to profile
+          <span className="text-xl leading-none">‹</span>
         </button>
 
         <h1 className="text-3xl font-black mb-2">Edit Profile</h1>
@@ -255,7 +244,6 @@ export default function EditProfile() {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">Shipping addresses</h2>
-
             {formData.shippingAddresses.length < 3 && (
               <button
                 type="button"
@@ -285,50 +273,22 @@ export default function EditProfile() {
                 </label>
               </div>
 
-              <input
-                name="streetAddress"
-                value={addr.streetAddress || ""}
-                onChange={(e) => handleAddressChange(i, e)}
-                placeholder="Street address"
-                className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
-              />
-
-              <input
-                name="city"
-                value={addr.city || ""}
-                onChange={(e) => handleAddressChange(i, e)}
-                placeholder="City"
-                className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
-              />
-
-              <input
-                name="state"
-                value={addr.state || ""}
-                onChange={(e) => handleAddressChange(i, e)}
-                placeholder="State"
-                className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
-              />
-
-              <input
-                name="country"
-                value={addr.country || ""}
-                onChange={(e) => handleAddressChange(i, e)}
-                placeholder="Country"
-                className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
-              />
-
-              <input
-                name="postalCode"
-                value={addr.postalCode || ""}
-                onChange={(e) => handleAddressChange(i, e)}
-                placeholder="Postal code"
-                className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
-              />
+              {["streetAddress", "city", "state", "country", "postalCode"].map(
+                (field) => (
+                  <input
+                    key={field}
+                    name={field}
+                    value={addr[field] || ""}
+                    onChange={(e) => handleAddressChange(i, e)}
+                    placeholder={field}
+                    className="w-full p-2.5 rounded-lg bg-[#111] border border-white/10"
+                  />
+                )
+              )}
             </div>
           ))}
         </div>
 
-        {/* ✅ Payment Methods */}
         <button
           type="button"
           onClick={() => navigate("/paymentmethods")}

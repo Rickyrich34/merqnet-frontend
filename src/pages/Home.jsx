@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Target, Swords, Trophy } from "lucide-react";
+import { Swords, Trophy } from "lucide-react";
 import logopic2 from "../assets/logopic2.png";
 
 const Home = () => {
@@ -110,21 +110,12 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Mission (REQUEST — VENDORS COMPETE — YOU WIN) */}
+            {/* Mission (VENDORS COMPETE — YOU WIN) */}
             <div className="mt-6 flex justify-center w-full">
               <div className="relative w-full max-w-[520px] px-4 py-4 rounded-2xl border border-white/10 bg-[#0B001F]/45 shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
                 <div className="absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
 
                 <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
-                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <Target className="w-4 h-4 text-cyan-200" />
-                    <span className="font-extrabold text-sm sm:text-base">
-                      REQUEST
-                    </span>
-                  </span>
-
-                  <span className="hidden sm:inline text-white/35 font-black">—</span>
-
                   <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                     <Swords className="w-4 h-4 text-fuchsia-200" />
                     <span className="font-extrabold text-sm sm:text-base text-cyan-200">
@@ -132,7 +123,9 @@ const Home = () => {
                     </span>
                   </span>
 
-                  <span className="hidden sm:inline text-white/35 font-black">—</span>
+                  <span className="hidden sm:inline text-white/35 font-black">
+                    —
+                  </span>
 
                   <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                     <Trophy className="w-4 h-4 text-amber-300" />

@@ -110,30 +110,24 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Mission (VENDORS COMPETE — YOU WIN) */}
+            {/* Mission (single pill like tagline; NEVER wraps on mobile) */}
             <div className="mt-6 flex justify-center w-full">
-              <div className="relative w-full max-w-[520px] px-4 py-4 rounded-2xl border border-white/10 bg-[#0B001F]/45 shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
-                <div className="absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
-
-                <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
-                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <Swords className="w-4 h-4 text-fuchsia-200" />
-                    <span className="font-extrabold text-sm sm:text-base text-cyan-200">
-                      VENDORS COMPETE
-                    </span>
-                  </span>
-
-                  <span className="hidden sm:inline text-white/35 font-black">
-                    —
-                  </span>
-
-                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                    <Trophy className="w-4 h-4 text-amber-300" />
-                    <span className="font-extrabold text-sm sm:text-base text-amber-300">
-                      YOU WIN
-                    </span>
-                  </span>
-                </div>
+              <div className="relative inline-flex items-center justify-center px-5 py-2 rounded-full border border-white/12 bg-white/[0.04] backdrop-blur shadow-[0_18px_55px_rgba(0,0,0,0.65)] overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 w-1/2 opacity-60"
+                  style={{
+                    animation: "shimmer 2.8s ease-in-out infinite",
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), rgba(34,211,238,0.14), transparent)",
+                  }}
+                />
+                <span className="relative inline-flex items-center gap-2 whitespace-nowrap text-[11px] sm:text-sm font-black tracking-[0.22em] uppercase text-white/95">
+                  <Swords className="w-4 h-4 text-fuchsia-200" />
+                  <span className="text-cyan-200">Vendors compete</span>
+                  <span className="text-white/35">—</span>
+                  <Trophy className="w-4 h-4 text-amber-300" />
+                  <span className="text-amber-300">You win</span>
+                </span>
               </div>
             </div>
 

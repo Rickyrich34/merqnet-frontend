@@ -359,7 +359,7 @@ const MainDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center pt-24 pb-64 px-4 bg-[#030014] text-white">
+    <div className="min-h-screen w-full flex flex-col items-center pt-36 pb-64 px-4 bg-[#030014] text-white">
       {/* 🔥 NEW NEON TITLE (only change) */}
       <h1 className="text-center mb-10 leading-tight">
         <span

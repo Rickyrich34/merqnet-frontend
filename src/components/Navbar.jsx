@@ -43,7 +43,8 @@ const Navbar = () => {
         return res.json();
       })
       .then((data) => {
-        const email = data?.email || data?.user?.email || data?.profile?.email || "";
+        const email =
+          data?.email || data?.user?.email || data?.profile?.email || "";
         if (email) {
           setUserEmail(email);
           localStorage.setItem("userEmail", email);
@@ -78,19 +79,20 @@ const Navbar = () => {
       <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
         {/* Left: Logo + Title + Email */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-3 min-w-0">
-            {/* Stronger icon */}
-            <div className="relative shrink-0">
-              <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-yellow-400/30 via-amber-400/25 to-orange-500/20 blur-xl" />
+          <Link
+            to={isLoggedIn ? "/dashboard" : "/"}
+            className="flex items-center gap-3 min-w-0"
+          >
+            {/* Stronger + cleaner dog (no neon blob) */}
+            <div className="relative shrink-0 flex items-center">
               <img
                 src={logopic2}
                 alt="MerqNet"
                 className="
-                  relative
-                  w-12 h-12 sm:w-14 sm:h-14
+                  w-11 h-11 sm:w-12 sm:h-12
                   object-contain
-                  saturate-150 contrast-125
-                  drop-shadow-[0_10px_25px_rgba(0,0,0,0.55)]
+                  brightness-110 contrast-140 saturate-110
+                  drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]
                 "
               />
             </div>
@@ -169,7 +171,11 @@ const Navbar = () => {
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
         >
-          {mobileOpen ? <X className="text-white" size={22} /> : <Menu className="text-white" size={22} />}
+          {mobileOpen ? (
+            <X className="text-white" size={22} />
+          ) : (
+            <Menu className="text-white" size={22} />
+          )}
         </button>
       </div>
 

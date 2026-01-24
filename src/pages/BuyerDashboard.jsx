@@ -192,7 +192,7 @@ export default function BuyerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pt-24 pb-20">
+    <div className="min-h-screen bg-black text-white pt-36 pb-20">
       <div className="max-w-5xl mx-auto px-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">

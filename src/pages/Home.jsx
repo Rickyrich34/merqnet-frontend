@@ -14,17 +14,27 @@ const Home = () => {
 
   return (
     <div className="min-h-[100svh] bg-[#05040b] text-white overflow-hidden pt-24 pb-24">
-      {/* Background */}
+      {/* Background (CENTERED, no right bias) */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[#05040b]" />
+
+        {/* centered glow */}
         <div
           className="absolute inset-0 opacity-95"
           style={{
             background:
-              "radial-gradient(900px 700px at 55% 35%, rgba(255,140,0,0.10), transparent 60%), radial-gradient(900px 700px at 45% 55%, rgba(255,0,200,0.08), transparent 62%), radial-gradient(900px 700px at 58% 60%, rgba(0,200,255,0.08), transparent 64%)",
+              "radial-gradient(900px 700px at 50% 32%, rgba(255,140,0,0.10), transparent 60%), radial-gradient(900px 700px at 50% 55%, rgba(255,0,200,0.08), transparent 62%), radial-gradient(900px 700px at 50% 62%, rgba(0,200,255,0.08), transparent 64%)",
           }}
         />
+
+        {/* vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/70" />
+
+        {/* subtle scanlines */}
+        <div className="absolute inset-0 opacity-[0.12] mix-blend-soft-light bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.06)_0px,rgba(255,255,255,0.06)_1px,transparent_3px,transparent_7px)]" />
+
+        {/* subtle grain */}
+        <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:6px_6px]" />
       </div>
 
       <style>{`
@@ -47,11 +57,10 @@ const Home = () => {
         }
       `}</style>
 
-      <main className="max-w-3xl mx-auto px-4">
+      <main className="max-w-4xl mx-auto px-4">
         <section className="min-h-[calc(100svh-12rem)] flex items-center justify-center">
-          <div className="w-full text-center">
-
-            {/* TITLE */}
+          <div className="w-full text-center flex flex-col items-center">
+            {/* TITLE (gold gradient like Navbar) */}
             <h1
               className="
                 text-5xl sm:text-7xl font-black tracking-tight
@@ -63,8 +72,8 @@ const Home = () => {
               MerqNet
             </h1>
 
-            {/* Tagline */}
-            <div className="mt-4 flex justify-center">
+            {/* Tagline (no brackets) */}
+            <div className="mt-4 flex justify-center w-full">
               <div className="relative inline-flex items-center justify-center px-5 py-2 rounded-full border border-white/12 bg-white/[0.04] backdrop-blur shadow-[0_18px_55px_rgba(0,0,0,0.65)] overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 w-1/2 opacity-60"
@@ -80,10 +89,17 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Dog */}
-            <div className="mt-6 flex justify-center">
+            {/* Dog (center spotlight so it doesn't look offset) */}
+            <div className="mt-6 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
-                <div className="absolute -inset-12 rounded-full blur-3xl opacity-45 bg-gradient-to-r from-fuchsia-500/25 via-orange-400/22 to-cyan-400/22" />
+                {/* centered spotlight */}
+                <div
+                  className="absolute -inset-16 rounded-full blur-3xl opacity-35"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 50% 50%, rgba(255,180,60,0.18), rgba(255,0,200,0.10), rgba(0,200,255,0.10), transparent 70%)",
+                  }}
+                />
                 <img
                   src={logopic2}
                   alt="MerqNet"
@@ -94,16 +110,17 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Mission */}
-            <div className="mt-6 flex justify-center">
+            {/* Mission (REQUEST — VENDORS COMPETE — YOU WIN) */}
+            <div className="mt-6 flex justify-center w-full">
               <div className="relative w-full max-w-[520px] px-4 py-4 rounded-2xl border border-white/10 bg-[#0B001F]/45 shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
                 <div className="absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
 
                 <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
-
                   <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                     <Target className="w-4 h-4 text-cyan-200" />
-                    <span className="font-extrabold text-sm sm:text-base">REQUEST</span>
+                    <span className="font-extrabold text-sm sm:text-base">
+                      REQUEST
+                    </span>
                   </span>
 
                   <span className="hidden sm:inline text-white/35 font-black">—</span>
@@ -123,13 +140,12 @@ const Home = () => {
                       YOU WIN
                     </span>
                   </span>
-
                 </div>
               </div>
             </div>
 
             {/* CTA */}
-            <div className="mt-7 flex justify-center">
+            <div className="mt-7 flex justify-center w-full">
               <button
                 onClick={handleEnter}
                 className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
@@ -138,7 +154,6 @@ const Home = () => {
                 ENTER
               </button>
             </div>
-
           </div>
         </section>
       </main>

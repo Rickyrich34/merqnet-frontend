@@ -49,9 +49,37 @@ const Home = () => {
               </span>
             </h1>
 
-            <p className="mt-2 text-sm sm:text-base text-white/75">
-              The buyer is in control.
-            </p>
+            {/* GAME TAGLINE (video-game style) */}
+            <div className="mt-3 flex justify-center">
+              <div
+                className="
+                  relative inline-flex items-center gap-2
+                  px-4 py-2 rounded-full
+                  border border-white/10
+                  bg-white/[0.03] backdrop-blur
+                  shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_14px_45px_rgba(0,0,0,0.55)]
+                "
+              >
+                {/* glow */}
+                <div className="pointer-events-none absolute -inset-6 rounded-full blur-2xl opacity-55 bg-gradient-to-r from-fuchsia-500/20 via-cyan-400/18 to-amber-400/18" />
+                {/* tiny pulse dot */}
+                <span className="relative inline-flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-cyan-300 opacity-70 animate-ping" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.8)]" />
+                </span>
+
+                <p
+                  className="
+                    relative text-sm sm:text-base font-extrabold tracking-wide
+                    text-transparent bg-clip-text
+                    bg-gradient-to-r from-white via-cyan-200 to-white
+                    [text-shadow:0_0_14px_rgba(34,211,238,0.35)]
+                  "
+                >
+                  The buyer is in control.
+                </p>
+              </div>
+            </div>
 
             {/* BIG dog/logo - scale down on mobile so the CTA stays visible */}
             <div className="mt-4 flex justify-center">
@@ -66,11 +94,37 @@ const Home = () => {
               </div>
             </div>
 
-            {/* 3-step line */}
-            <p className="mt-3 text-sm sm:text-base font-semibold text-white/85">
-              Request <span className="text-white/40">—</span> Vendors compete{" "}
-              <span className="text-white/40">—</span> You save
-            </p>
+            {/* 3-step line (mission steps style) */}
+            <div className="mt-4 flex justify-center">
+              <div
+                className="
+                  relative inline-flex items-center justify-center
+                  gap-2 sm:gap-3
+                  px-4 py-2 rounded-xl
+                  border border-white/10
+                  bg-[#0B001F]/35
+                  shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_16px_55px_rgba(0,0,0,0.6)]
+                "
+              >
+                <div className="pointer-events-none absolute -inset-6 rounded-2xl blur-2xl opacity-45 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
+
+                <span className="relative text-sm sm:text-base font-extrabold tracking-wide text-white/95 [text-shadow:0_0_16px_rgba(255,255,255,0.18)]">
+                  Request
+                </span>
+
+                <span className="relative text-white/25 font-black select-none">—</span>
+
+                <span className="relative text-sm sm:text-base font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-white to-cyan-200 [text-shadow:0_0_18px_rgba(34,211,238,0.25)]">
+                  Vendors compete
+                </span>
+
+                <span className="relative text-white/25 font-black select-none">—</span>
+
+                <span className="relative text-sm sm:text-base font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-400 to-orange-400 [text-shadow:0_0_18px_rgba(251,191,36,0.25)]">
+                  You save
+                </span>
+              </div>
+            </div>
 
             {/* Single CTA */}
             <div className="mt-6 flex justify-center">

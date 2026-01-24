@@ -51,7 +51,7 @@ const Home = () => {
         <section className="min-h-[calc(100svh-12rem)] flex items-center justify-center">
           <div className="w-full text-center">
 
-            {/* TITLE – same gold gradient as Navbar */}
+            {/* TITLE */}
             <h1
               className="
                 text-5xl sm:text-7xl font-black tracking-tight
@@ -77,8 +77,6 @@ const Home = () => {
                 <span className="relative text-[11px] sm:text-sm font-black tracking-[0.22em] uppercase text-white/95">
                   <span className="text-cyan-200">The buyer</span> is in control.
                 </span>
-                <span className="absolute left-2 text-cyan-300/60 font-black">[</span>
-                <span className="absolute right-2 text-cyan-300/60 font-black">]</span>
               </div>
             </div>
 
@@ -96,12 +94,13 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Mission steps */}
+            {/* Mission */}
             <div className="mt-6 flex justify-center">
               <div className="relative w-full max-w-[520px] px-4 py-4 rounded-2xl border border-white/10 bg-[#0B001F]/45 shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
                 <div className="absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
 
                 <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
+
                   <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                     <Target className="w-4 h-4 text-cyan-200" />
                     <span className="font-extrabold text-sm sm:text-base">REQUEST</span>
@@ -121,9 +120,10 @@ const Home = () => {
                   <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                     <Trophy className="w-4 h-4 text-amber-300" />
                     <span className="font-extrabold text-sm sm:text-base text-amber-300">
-                      YOU SAVE
+                      YOU WIN
                     </span>
                   </span>
+
                 </div>
               </div>
             </div>

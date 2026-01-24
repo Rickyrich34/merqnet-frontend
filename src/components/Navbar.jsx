@@ -22,7 +22,6 @@ const Navbar = () => {
 
   const getUserId = () => localStorage.getItem("userId") || "";
 
-  // Close mobile menu when route changes
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
@@ -83,7 +82,7 @@ const Navbar = () => {
             to={isLoggedIn ? "/dashboard" : "/"}
             className="flex items-center gap-3 min-w-0"
           >
-            {/* Stronger + cleaner dog (no neon blob) */}
+            {/* Dog logo */}
             <div className="relative shrink-0 flex items-center">
               <img
                 src={logopic2}
@@ -97,7 +96,7 @@ const Navbar = () => {
               />
             </div>
 
-            {/* Gold gradient brand text */}
+            {/* Brand text */}
             <span
               className="
                 text-xl sm:text-2xl font-black tracking-tight
@@ -179,7 +178,7 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile dropdown panel */}
+      {/* Mobile dropdown */}
       {mobileOpen && (
         <div className="sm:hidden px-3 pb-4">
           <div className="rounded-2xl border border-white/10 bg-[#060417]/95 backdrop-blur-md shadow-[0_0_25px_rgba(160,90,255,0.25)] overflow-hidden">
@@ -216,7 +215,10 @@ const Navbar = () => {
                   Profile
                 </Link>
 
-                <button onClick={handleLogout} className={`${mobileLink} text-red-300`}>
+                <button
+                  onClick={handleLogout}
+                  className={`${mobileLink} text-red-300`}
+                >
                   Logout
                 </button>
               </div>

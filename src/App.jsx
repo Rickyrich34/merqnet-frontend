@@ -37,6 +37,9 @@ import Terms from "./pages/Terms";
 import History from "./pages/History";
 import Messages from "./pages/Messages";
 
+/* ✅ NEW */
+import Bids from "./pages/Bids";
+
 /* COMPONENTS */
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -69,10 +72,9 @@ function App() {
 
         <Route path="/accept-bid/:bidId" element={<AcceptBid />} />
 
-        {/* ✅ FIX: BuyerDashboard "View bids" */}
-        <Route path="/bids/:requestId" element={<SellerBids />} />
+        {/* ✅ FIX: BuyerDashboard "View bids" should hit BUYER bids page */}
+        <Route path="/bids/:requestId" element={<Bids />} />
 
-        {/* ✅ Existing accept flow */}
         <Route path="/requests/:requestId/acceptbid" element={<AcceptBid />} />
 
         {/* MESSAGE THREADS / Q&A */}

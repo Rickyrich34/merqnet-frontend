@@ -2,20 +2,30 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+/**
+ * ✅ PRODUCTION-PROOF API BASE
+ * - If VITE vars exist but are empty/invalid, fallback to Railway backend.
+ * - Prevents calls like https://app.merqnet.com/<userId>
+ */
+const RAW_ENV_API =
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL)) ||
+  "";
+
 const API = (
-  import.meta?.env?.VITE_API_URL ||
-  import.meta?.env?.VITE_API_BASE_URL ||
-  "https://merqnet-backend-production.up.railway.app"
+  RAW_ENV_API &&
+  typeof RAW_ENV_API === "string" &&
+  RAW_ENV_API.startsWith("http")
+    ? RAW_ENV_API
+    : "https://merqnet-backend-production.up.railway.app"
 ).replace(/\/$/, "");
 
 const EditProfile = () => {
   const navigate = useNavigate();
 
   // ✅ match ProfileView behavior: userToken OR token
-  const token =
-    localStorage.getItem("userToken") ||
-    localStorage.getItem("token");
-
+  const token = localStorage.getItem("userToken") || localStorage.getItem("token");
   const userId = localStorage.getItem("userId");
 
   const [loading, setLoading] = useState(true);
@@ -44,7 +54,9 @@ const EditProfile = () => {
 
     const fetchUser = async () => {
       try {
-        const res = await axios.get(`${API}/api/users/profile/${userId}`, {
+        const url = `${API}/api/users/profile/${userId}`;
+
+        const res = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -55,12 +67,20 @@ const EditProfile = () => {
           email: user.email || "",
           phone: user.phone || "",
           acceptsInternationalTrade: !!user.acceptsInternationalTrade,
-          shippingAddresses: Array.isArray(user.shippingAddresses)
-            ? user.shippingAddresses
-            : [],
+          shippingAddresses: Array.isArray(user.shippingAddresses) ? user.shippingAddresses : [],
         });
       } catch (error) {
-        console.error("Error loading profile:", error);
+        // ✅ Better debugging without changing behavior
+        const status = error?.response?.status;
+        const data = error?.response?.data;
+        console.error("Error loading profile:", { status, data, error });
+
+        // If unauthorized, bounce to login (prevents stuck UX loops)
+        if (status === 401 || status === 403) {
+          setLoading(false);
+          navigate("/login");
+          return;
+        }
       } finally {
         setLoading(false);
       }
@@ -140,7 +160,13 @@ const EditProfile = () => {
 
       navigate("/profile");
     } catch (error) {
-      console.error("Error saving changes:", error);
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      console.error("Error saving changes:", { status, data, error });
+
+      if (status === 401 || status === 403) {
+        navigate("/login");
+      }
     }
   };
 
@@ -181,8 +207,7 @@ const EditProfile = () => {
     <div
       className="min-h-screen pt-24 px-6 pb-40 text-white flex justify-center"
       style={{
-        background:
-          "linear-gradient(135deg, #0a0122 0%, #120034 50%, #1a0060 100%)",
+        background: "linear-gradient(135deg, #0a0122 0%, #120034 50%, #1a0060 100%)",
       }}
     >
       <div className="max-w-2xl w-full bg-black/40 backdrop-blur-xl p-10 rounded-2xl shadow-[0_0_30px_#9900ff] border border-purple-700 relative">
@@ -214,9 +239,7 @@ const EditProfile = () => {
           </label>
         </div>
 
-        <h2 className="text-2xl font-semibold text-purple-400 mb-3">
-          Shipping Addresses
-        </h2>
+        <h2 className="text-2xl font-semibold text-purple-400 mb-3">Shipping Addresses</h2>
 
         {formData.shippingAddresses.map((addr) => (
           <div
@@ -229,9 +252,7 @@ const EditProfile = () => {
                 type="text"
                 className="w-full p-2 rounded bg-black/40 border border-purple-700"
                 value={addr.streetAddress || ""}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "streetAddress", e.target.value)
-                }
+                onChange={(e) => handleAddressChange(addr._id, "streetAddress", e.target.value)}
               />
             </div>
 
@@ -241,9 +262,7 @@ const EditProfile = () => {
                 type="text"
                 className="w-full p-2 rounded bg-black/40 border border-purple-700"
                 value={addr.city || ""}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "city", e.target.value)
-                }
+                onChange={(e) => handleAddressChange(addr._id, "city", e.target.value)}
               />
             </div>
 
@@ -253,9 +272,7 @@ const EditProfile = () => {
                 type="text"
                 className="w-full p-2 rounded bg-black/40 border border-purple-700"
                 value={addr.state || ""}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "state", e.target.value)
-                }
+                onChange={(e) => handleAddressChange(addr._id, "state", e.target.value)}
               />
             </div>
 
@@ -265,9 +282,7 @@ const EditProfile = () => {
                 type="text"
                 className="w-full p-2 rounded bg-black/40 border border-purple-700"
                 value={addr.country || ""}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "country", e.target.value)
-                }
+                onChange={(e) => handleAddressChange(addr._id, "country", e.target.value)}
               />
             </div>
 
@@ -277,18 +292,12 @@ const EditProfile = () => {
                 type="text"
                 className="w-full p-2 rounded bg-black/40 border border-purple-700"
                 value={addr.postalCode || ""}
-                onChange={(e) =>
-                  handleAddressChange(addr._id, "postalCode", e.target.value)
-                }
+                onChange={(e) => handleAddressChange(addr._id, "postalCode", e.target.value)}
               />
             </div>
 
             <label className="flex items-center gap-2 mt-2 text-purple-300">
-              <input
-                type="radio"
-                checked={!!addr.isDefault}
-                onChange={() => setDefaultAddress(addr._id)}
-              />
+              <input type="radio" checked={!!addr.isDefault} onChange={() => setDefaultAddress(addr._id)} />
               Default address
             </label>
           </div>
@@ -303,9 +312,7 @@ const EditProfile = () => {
           Add Address
         </button>
 
-        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">
-          Password
-        </h2>
+        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">Password</h2>
         <button
           type="button"
           onClick={() => navigate("/changepassword")}
@@ -314,9 +321,7 @@ const EditProfile = () => {
           Change Password
         </button>
 
-        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">
-          Payment Methods
-        </h2>
+        <h2 className="text-2xl font-semibold text-purple-400 mt-10 mb-3">Payment Methods</h2>
         <button
           type="button"
           onClick={() => navigate("/paymentmethods")}

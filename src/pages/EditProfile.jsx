@@ -38,7 +38,7 @@ export default function EditProfile() {
   });
 
   /* ================================
-     Auth + Load user
+     Load user
   ================================== */
   useEffect(() => {
     if (!token || !userId) {
@@ -188,7 +188,7 @@ export default function EditProfile() {
     <div className="min-h-screen pt-24 pb-32 px-4 text-white bg-black flex justify-center">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xl bg-black/60 p-8 rounded-2xl border border-purple-700 space-y-6"
+        className="w-full max-w-xl bg-black/70 p-8 rounded-2xl shadow-xl space-y-6"
       >
         <h1 className="text-3xl font-bold mb-2">Edit Profile</h1>
 
@@ -243,7 +243,7 @@ export default function EditProfile() {
           {formData.shippingAddresses.map((addr, i) => (
             <div
               key={i}
-              className="border border-purple-700/40 p-4 rounded space-y-2"
+              className="border border-white/10 p-4 rounded space-y-2"
             >
               <div className="flex justify-between items-center">
                 <strong>Address {i + 1}</strong>
@@ -296,7 +296,7 @@ export default function EditProfile() {
           ))}
         </div>
 
-        {/* ✅ Payment Methods button (always navigates) */}
+        {/* Payment Methods */}
         <button
           type="button"
           onClick={() => navigate("/paymentmethods")}

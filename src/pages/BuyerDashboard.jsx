@@ -266,7 +266,7 @@ export default function BuyerDashboard() {
 
                   <button
                     onClick={() => navigate(`/bids/${rid}`)}
-                    className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-cyan-400/40 text-cyan-200 hover:bg-cyan-400/10"
+                    className="flex items-center gap-1 text-sm px-4 py-2 rounded-xl font-bold text-black bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 transition shadow-[0_8px_25px_rgba(251,191,36,0.45)]"
                   >
                     <ReceiptText className="w-4 h-4" />
                     View bids

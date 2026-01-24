@@ -78,13 +78,33 @@ const Navbar = () => {
       <div className="flex justify-between items-center px-4 sm:px-10 py-4 sm:py-5">
         {/* Left: Logo + Title + Email */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-2">
-            <img
-              src={logopic2}
-              alt="MerqNet"
-              className="w-10 h-10 object-contain brightness-150 contrast-150 saturate-200 drop-shadow-[0_0_16px_#ff00ff]"
-            />
-            <span className="text-lg sm:text-xl font-extrabold text-purple-200 tracking-wide">
+          <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-3 min-w-0">
+            {/* Stronger icon */}
+            <div className="relative shrink-0">
+              <div className="absolute -inset-2 rounded-full bg-gradient-to-r from-yellow-400/30 via-amber-400/25 to-orange-500/20 blur-xl" />
+              <img
+                src={logopic2}
+                alt="MerqNet"
+                className="
+                  relative
+                  w-12 h-12 sm:w-14 sm:h-14
+                  object-contain
+                  saturate-150 contrast-125
+                  drop-shadow-[0_10px_25px_rgba(0,0,0,0.55)]
+                "
+              />
+            </div>
+
+            {/* Gold gradient brand text */}
+            <span
+              className="
+                text-xl sm:text-2xl font-black tracking-tight
+                bg-gradient-to-r from-yellow-200 via-amber-400 to-orange-500
+                bg-clip-text text-transparent
+                drop-shadow-[0_2px_10px_rgba(0,0,0,0.65)]
+                whitespace-nowrap
+              "
+            >
               MerqNet
             </span>
           </Link>
@@ -149,11 +169,7 @@ const Navbar = () => {
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
         >
-          {mobileOpen ? (
-            <X className="text-white" size={22} />
-          ) : (
-            <Menu className="text-white" size={22} />
-          )}
+          {mobileOpen ? <X className="text-white" size={22} /> : <Menu className="text-white" size={22} />}
         </button>
       </div>
 

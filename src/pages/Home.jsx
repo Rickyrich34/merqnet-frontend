@@ -6,7 +6,6 @@ import logopic2 from "../assets/logopic2.png";
 const Home = () => {
   const navigate = useNavigate();
 
-  // REAL behavior: if logged in -> dashboard, else -> login
   const handleEnter = () => {
     const token =
       localStorage.getItem("token") || localStorage.getItem("userToken");
@@ -15,12 +14,9 @@ const Home = () => {
 
   return (
     <div className="min-h-[100svh] bg-[#05040b] text-white overflow-hidden pt-24 pb-24">
-      {/* REALISTIC GAME UI overlays (web-feasible) */}
+      {/* Background */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        {/* base */}
         <div className="absolute inset-0 bg-[#05040b]" />
-
-        {/* soft brand glow (web realistic, not cinematic bloom) */}
         <div
           className="absolute inset-0 opacity-95"
           style={{
@@ -28,18 +24,9 @@ const Home = () => {
               "radial-gradient(900px 700px at 55% 35%, rgba(255,140,0,0.10), transparent 60%), radial-gradient(900px 700px at 45% 55%, rgba(255,0,200,0.08), transparent 62%), radial-gradient(900px 700px at 58% 60%, rgba(0,200,255,0.08), transparent 64%)",
           }}
         />
-
-        {/* vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/70" />
-
-        {/* scanlines (subtle) */}
-        <div className="absolute inset-0 opacity-[0.14] mix-blend-soft-light bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.06)_0px,rgba(255,255,255,0.06)_1px,transparent_3px,transparent_7px)]" />
-
-        {/* noise grain (subtle) */}
-        <div className="absolute inset-0 opacity-[0.08] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:6px_6px]" />
       </div>
 
-      {/* Local CSS (no config needed) */}
       <style>{`
         @keyframes shimmer {
           0% { transform: translateX(-120%); opacity: 0; }
@@ -63,46 +50,22 @@ const Home = () => {
       <main className="max-w-3xl mx-auto px-4">
         <section className="min-h-[calc(100svh-12rem)] flex items-center justify-center">
           <div className="w-full text-center">
-            {/* TITLE (heavy + game-like) */}
-            <div className="relative inline-block">
-              {/* Outer glow plate */}
-              <div className="pointer-events-none absolute -inset-8 rounded-[28px] blur-3xl opacity-40 bg-gradient-to-r from-fuchsia-500/25 via-amber-400/20 to-cyan-400/20" />
-              <h1 className="relative text-5xl sm:text-7xl font-extrabold tracking-tight">
-                <span
-                  className="
-                    text-white
-                    [text-shadow:0_10px_40px_rgba(0,0,0,0.75)]
-                    [-webkit-text-stroke:1px_rgba(255,255,255,0.12)]
-                  "
-                >
-                  MERQ
-                </span>
-                <span
-                  className="
-                    text-transparent bg-clip-text
-                    bg-gradient-to-r from-yellow-200 via-amber-400 to-orange-500
-                    [text-shadow:0_10px_40px_rgba(0,0,0,0.75)]
-                    [-webkit-text-stroke:1px_rgba(255,200,120,0.18)]
-                  "
-                >
-                  NET
-                </span>
-              </h1>
-            </div>
 
-            {/* TAGLINE (NOT flat: quest badge + stroke + shimmer) */}
+            {/* TITLE – same gold gradient as Navbar */}
+            <h1
+              className="
+                text-5xl sm:text-7xl font-black tracking-tight
+                bg-gradient-to-r from-yellow-200 via-amber-400 to-orange-500
+                bg-clip-text text-transparent
+                drop-shadow-[0_6px_30px_rgba(0,0,0,0.65)]
+              "
+            >
+              MerqNet
+            </h1>
+
+            {/* Tagline */}
             <div className="mt-4 flex justify-center">
-              <div
-                className="
-                  relative inline-flex items-center justify-center
-                  px-5 py-2 rounded-full
-                  border border-white/12
-                  bg-white/[0.04] backdrop-blur
-                  shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_55px_rgba(0,0,0,0.65)]
-                  overflow-hidden
-                "
-              >
-                {/* animated shimmer sweep */}
+              <div className="relative inline-flex items-center justify-center px-5 py-2 rounded-full border border-white/12 bg-white/[0.04] backdrop-blur shadow-[0_18px_55px_rgba(0,0,0,0.65)] overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 w-1/2 opacity-60"
                   style={{
@@ -111,76 +74,57 @@ const Home = () => {
                       "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), rgba(34,211,238,0.14), transparent)",
                   }}
                 />
-
                 <span className="relative text-[11px] sm:text-sm font-black tracking-[0.22em] uppercase text-white/95">
-                  <span className="text-cyan-200 [text-shadow:0_0_18px_rgba(34,211,238,0.38)]">
-                    The buyer
-                  </span>{" "}
-                  is in control
-                  <span className="text-white/65">.</span>
+                  <span className="text-cyan-200">The buyer</span> is in control.
                 </span>
-
-                {/* brackets to feel like HUD */}
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-cyan-300/60 font-black">
-                  [
-                </span>
-                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-cyan-300/60 font-black">
-                  ]
-                </span>
+                <span className="absolute left-2 text-cyan-300/60 font-black">[</span>
+                <span className="absolute right-2 text-cyan-300/60 font-black">]</span>
               </div>
             </div>
 
-            {/* DOG (kept, but presented like a game centerpiece) */}
+            {/* Dog */}
             <div className="mt-6 flex justify-center">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
-                <div className="pointer-events-none absolute -inset-12 rounded-full blur-3xl opacity-45 bg-gradient-to-r from-fuchsia-500/25 via-orange-400/22 to-cyan-400/22" />
+                <div className="absolute -inset-12 rounded-full blur-3xl opacity-45 bg-gradient-to-r from-fuchsia-500/25 via-orange-400/22 to-cyan-400/22" />
                 <img
                   src={logopic2}
                   alt="MerqNet"
-                  draggable="false"
                   className="relative w-full h-auto select-none"
+                  draggable="false"
                   style={{ animation: "floaty 4.2s ease-in-out infinite" }}
                 />
               </div>
             </div>
 
-            {/* MISSION STEPS (NOT flat: chips + icons + glow) */}
+            {/* Mission steps */}
             <div className="mt-6 flex justify-center">
-              <div
-                className="
-                  relative inline-flex flex-wrap items-center justify-center gap-2
-                  px-4 py-3 rounded-2xl
-                  border border-white/10
-                  bg-[#0B001F]/45
-                  shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_20px_70px_rgba(0,0,0,0.65)]
-                "
-              >
-                <div className="pointer-events-none absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
+              <div className="relative w-full max-w-[520px] px-4 py-4 rounded-2xl border border-white/10 bg-[#0B001F]/45 shadow-[0_20px_70px_rgba(0,0,0,0.65)]">
+                <div className="absolute -inset-8 rounded-3xl blur-2xl opacity-35 bg-gradient-to-r from-amber-400/18 via-fuchsia-500/14 to-cyan-400/16" />
 
-                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                  <Target className="w-4 h-4 text-cyan-200" />
-                  <span className="text-sm sm:text-base font-extrabold tracking-wide text-white/95 [text-shadow:0_0_16px_rgba(255,255,255,0.14)]">
-                    REQUEST
+                <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
+                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                    <Target className="w-4 h-4 text-cyan-200" />
+                    <span className="font-extrabold text-sm sm:text-base">REQUEST</span>
                   </span>
-                </span>
 
-                <span className="text-white/35 font-black px-1">—</span>
+                  <span className="hidden sm:inline text-white/35 font-black">—</span>
 
-                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                  <Swords className="w-4 h-4 text-fuchsia-200" />
-                  <span className="text-sm sm:text-base font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-200 via-white to-cyan-200 [text-shadow:0_0_18px_rgba(34,211,238,0.20)]">
-                    VENDORS COMPETE
+                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                    <Swords className="w-4 h-4 text-fuchsia-200" />
+                    <span className="font-extrabold text-sm sm:text-base text-cyan-200">
+                      VENDORS COMPETE
+                    </span>
                   </span>
-                </span>
 
-                <span className="text-white/35 font-black px-1">—</span>
+                  <span className="hidden sm:inline text-white/35 font-black">—</span>
 
-                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-                  <Trophy className="w-4 h-4 text-amber-300" />
-                  <span className="text-sm sm:text-base font-extrabold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-400 to-orange-400 [text-shadow:0_0_18px_rgba(251,191,36,0.22)]">
-                    YOU SAVE
+                  <span className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                    <Trophy className="w-4 h-4 text-amber-300" />
+                    <span className="font-extrabold text-sm sm:text-base text-amber-300">
+                      YOU SAVE
+                    </span>
                   </span>
-                </span>
+                </div>
               </div>
             </div>
 
@@ -188,21 +132,13 @@ const Home = () => {
             <div className="mt-7 flex justify-center">
               <button
                 onClick={handleEnter}
-                className="
-                  relative w-[260px]
-                  rounded-xl px-10 py-3
-                  font-extrabold tracking-[0.20em] uppercase
-                  border border-cyan-200/55
-                  bg-cyan-400/10
-                  shadow-[0_0_30px_rgba(34,211,238,0.22)]
-                  hover:border-cyan-200/75 hover:bg-cyan-400/15
-                  transition
-                "
+                className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
                 style={{ animation: "pulseGlow 2.6s ease-in-out infinite" }}
               >
                 ENTER
               </button>
             </div>
+
           </div>
         </section>
       </main>

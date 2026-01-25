@@ -81,30 +81,27 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Dog container */}
-            <div className="mt-6 flex justify-center w-full">
+            {/* CONTROL YOUR GAME (above dog) */}
+            <div className="mt-6 mb-2 flex justify-center w-full">
+              <span
+                className="
+                  text-cyan-200/70
+                  text-sm sm:text-base
+                  font-extrabold
+                  tracking-[0.45em]
+                  uppercase
+                "
+                style={{
+                  textShadow: "0 0 20px rgba(34,211,238,0.45)",
+                }}
+              >
+                CONTROL&nbsp;YOUR&nbsp;GAME
+              </span>
+            </div>
+
+            {/* Dog */}
+            <div className="mt-2 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
-
-                {/* Phrase inside dog */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <span
-                    className="
-                      text-cyan-300/15
-                      text-xl sm:text-3xl
-                      font-extrabold
-                      tracking-[0.45em]
-                      uppercase
-                      select-none
-                    "
-                    style={{
-                      textShadow: "0 0 25px rgba(34,211,238,0.25)",
-                    }}
-                  >
-                    CONTROL&nbsp;YOUR&nbsp;GAME
-                  </span>
-                </div>
-
-                {/* Glow */}
                 <div
                   className="absolute -inset-16 rounded-full blur-3xl opacity-35"
                   style={{
@@ -112,7 +109,6 @@ const Home = () => {
                       "radial-gradient(circle at 50% 50%, rgba(255,180,60,0.18), rgba(255,0,200,0.10), rgba(0,200,255,0.10), transparent 70%)",
                   }}
                 />
-
                 <img
                   src={logopic2}
                   alt="MerqNet"

@@ -52,7 +52,6 @@ const Home = () => {
       `}</style>
 
       <main className="max-w-4xl mx-auto px-4">
-        {/* 🔧 changed section layout */}
         <section className="pt-6 pb-10">
           <div className="w-full text-center flex flex-col items-center">
             {/* TITLE */}
@@ -84,18 +83,7 @@ const Home = () => {
               </div>
             </div>
 
-            {/* ✅ CTA moved here */}
-            <div className="mt-6 flex justify-center w-full">
-              <button
-                onClick={handleEnter}
-                className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
-                style={{ animation: "pulseGlow 2.6s ease-in-out infinite" }}
-              >
-                ENTER
-              </button>
-            </div>
-
-            {/* Dog (unchanged) */}
+            {/* Dog */}
             <div className="mt-6 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
                 <div
@@ -113,6 +101,17 @@ const Home = () => {
                   style={{ animation: "floaty 4.2s ease-in-out infinite" }}
                 />
               </div>
+            </div>
+
+            {/* CTA – now correctly placed */}
+            <div className="mt-4 flex justify-center w-full">
+              <button
+                onClick={handleEnter}
+                className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
+                style={{ animation: "pulseGlow 2.6s ease-in-out infinite" }}
+              >
+                ENTER
+              </button>
             </div>
 
             {/* Mission */}

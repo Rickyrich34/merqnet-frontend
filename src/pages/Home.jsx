@@ -81,8 +81,8 @@ const Home = () => {
               </div>
             </div>
 
-            {/* CONTROL YOUR GAME (above dog) */}
-            <div className="mt-6 mb-2 flex justify-center w-full">
+            {/* CONTROL YOUR GAME – just above dog */}
+            <div className="mt-10 mb-3 flex justify-center w-full">
               <span
                 className="
                   text-cyan-200/70

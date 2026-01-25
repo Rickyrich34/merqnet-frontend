@@ -13,7 +13,11 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-[100svh] bg-[#05040b] text-white overflow-hidden pt-24 pb-24">
+   <div
+  className="min-h-[100svh] bg-[#05040b] text-white overflow-hidden pt-24 sm:pt-24 pb-40 sm:pb-24"
+  style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10rem)" }}
+>
+
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[#05040b]" />

@@ -17,7 +17,6 @@ const Home = () => {
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[#05040b]" />
-
         <div
           className="absolute inset-0 opacity-95"
           style={{
@@ -25,7 +24,6 @@ const Home = () => {
               "radial-gradient(900px 700px at 50% 32%, rgba(255,140,0,0.10), transparent 60%), radial-gradient(900px 700px at 50% 55%, rgba(255,0,200,0.08), transparent 62%), radial-gradient(900px 700px at 50% 62%, rgba(0,200,255,0.08), transparent 64%)",
           }}
         />
-
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/70" />
         <div className="absolute inset-0 opacity-[0.12] mix-blend-soft-light bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.06)_0px,rgba(255,255,255,0.06)_1px,transparent_3px,transparent_7px)]" />
         <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:6px_6px]" />
@@ -83,9 +81,30 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Dog */}
+            {/* Dog container */}
             <div className="mt-6 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
+
+                {/* Phrase inside dog */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span
+                    className="
+                      text-cyan-300/15
+                      text-xl sm:text-3xl
+                      font-extrabold
+                      tracking-[0.45em]
+                      uppercase
+                      select-none
+                    "
+                    style={{
+                      textShadow: "0 0 25px rgba(34,211,238,0.25)",
+                    }}
+                  >
+                    CONTROL&nbsp;YOUR&nbsp;GAME
+                  </span>
+                </div>
+
+                {/* Glow */}
                 <div
                   className="absolute -inset-16 rounded-full blur-3xl opacity-35"
                   style={{
@@ -93,6 +112,7 @@ const Home = () => {
                       "radial-gradient(circle at 50% 50%, rgba(255,180,60,0.18), rgba(255,0,200,0.10), rgba(0,200,255,0.10), transparent 70%)",
                   }}
                 />
+
                 <img
                   src={logopic2}
                   alt="MerqNet"
@@ -104,7 +124,7 @@ const Home = () => {
             </div>
 
             {/* CTA */}
-            <div className="mt-4 flex justify-center w-full">
+            <div className="-mt-8 sm:mt-4 flex justify-center w-full">
               <button
                 onClick={handleEnter}
                 className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
@@ -134,6 +154,7 @@ const Home = () => {
                 </span>
               </div>
             </div>
+
           </div>
         </section>
       </main>

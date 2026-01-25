@@ -14,11 +14,10 @@ const Home = () => {
 
   return (
     <div className="min-h-[100svh] bg-[#05040b] text-white overflow-hidden pt-24 pb-24">
-      {/* Background (CENTERED, no right bias) */}
+      {/* Background */}
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-[#05040b]" />
 
-        {/* centered glow */}
         <div
           className="absolute inset-0 opacity-95"
           style={{
@@ -27,13 +26,8 @@ const Home = () => {
           }}
         />
 
-        {/* vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/70" />
-
-        {/* subtle scanlines */}
         <div className="absolute inset-0 opacity-[0.12] mix-blend-soft-light bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.06)_0px,rgba(255,255,255,0.06)_1px,transparent_3px,transparent_7px)]" />
-
-        {/* subtle grain */}
         <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:6px_6px]" />
       </div>
 
@@ -58,9 +52,10 @@ const Home = () => {
       `}</style>
 
       <main className="max-w-4xl mx-auto px-4">
-        <section className="min-h-[calc(100svh-12rem)] flex items-center justify-center">
+        {/* 🔧 changed section layout */}
+        <section className="pt-6 pb-10">
           <div className="w-full text-center flex flex-col items-center">
-            {/* TITLE (gold gradient like Navbar) */}
+            {/* TITLE */}
             <h1
               className="
                 text-5xl sm:text-7xl font-black tracking-tight
@@ -72,7 +67,7 @@ const Home = () => {
               MerqNet
             </h1>
 
-            {/* Tagline (no brackets) */}
+            {/* Tagline */}
             <div className="mt-4 flex justify-center w-full">
               <div className="relative inline-flex items-center justify-center px-5 py-2 rounded-full border border-white/12 bg-white/[0.04] backdrop-blur shadow-[0_18px_55px_rgba(0,0,0,0.65)] overflow-hidden">
                 <div
@@ -89,10 +84,20 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Dog (center spotlight so it doesn't look offset) */}
+            {/* ✅ CTA moved here */}
+            <div className="mt-6 flex justify-center w-full">
+              <button
+                onClick={handleEnter}
+                className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
+                style={{ animation: "pulseGlow 2.6s ease-in-out infinite" }}
+              >
+                ENTER
+              </button>
+            </div>
+
+            {/* Dog (unchanged) */}
             <div className="mt-6 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
-                {/* centered spotlight */}
                 <div
                   className="absolute -inset-16 rounded-full blur-3xl opacity-35"
                   style={{
@@ -110,7 +115,7 @@ const Home = () => {
               </div>
             </div>
 
-            {/* Mission (single pill like tagline; NEVER wraps on mobile) */}
+            {/* Mission */}
             <div className="mt-6 flex justify-center w-full">
               <div className="relative inline-flex items-center justify-center px-5 py-2 rounded-full border border-white/12 bg-white/[0.04] backdrop-blur shadow-[0_18px_55px_rgba(0,0,0,0.65)] overflow-hidden">
                 <div
@@ -129,17 +134,6 @@ const Home = () => {
                   <span className="text-amber-300">You win</span>
                 </span>
               </div>
-            </div>
-
-            {/* CTA */}
-            <div className="mt-7 flex justify-center w-full">
-              <button
-                onClick={handleEnter}
-                className="relative w-[260px] rounded-xl px-10 py-3 font-extrabold tracking-[0.20em] uppercase border border-cyan-200/55 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.22)] hover:border-cyan-200/75 hover:bg-cyan-400/15 transition"
-                style={{ animation: "pulseGlow 2.6s ease-in-out infinite" }}
-              >
-                ENTER
-              </button>
             </div>
           </div>
         </section>

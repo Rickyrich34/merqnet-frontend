@@ -73,7 +73,7 @@ const Navbar = () => {
     <nav
       id="merqnet-navbar"
       data-navbar="merqnet"
-      className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md border-b border-white/10"
+      className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md"
     >
       <div className="flex justify-between items-center px-4 sm:px-10 py-3 sm:py-4">
         {/* Left: Logo + Title + Email */}
@@ -82,7 +82,6 @@ const Navbar = () => {
             to={isLoggedIn ? "/dashboard" : "/"}
             className="flex items-center gap-3 min-w-0"
           >
-            {/* BIG Dog logo */}
             <div className="relative shrink-0 flex items-center">
               <img
                 src={logopic2}
@@ -96,7 +95,6 @@ const Navbar = () => {
               />
             </div>
 
-            {/* Brand text */}
             <span
               className="
                 text-xl sm:text-2xl font-black tracking-tight

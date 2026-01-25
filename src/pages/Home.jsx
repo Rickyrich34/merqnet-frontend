@@ -81,27 +81,27 @@ const Home = () => {
               </div>
             </div>
 
-            {/* CONTROL YOUR GAME – just above dog */}
-            <div className="mt-10 mb-3 flex justify-center w-full">
-              <span
-                className="
-                  text-cyan-200/70
-                  text-sm sm:text-base
-                  font-extrabold
-                  tracking-[0.45em]
-                  uppercase
-                "
-                style={{
-                  textShadow: "0 0 20px rgba(34,211,238,0.45)",
-                }}
-              >
-                CONTROL&nbsp;YOUR&nbsp;GAME
-              </span>
-            </div>
-
             {/* Dog */}
             <div className="mt-2 flex justify-center w-full">
               <div className="relative w-[280px] sm:w-[430px] max-w-full">
+                {/* CONTROL YOUR GAME — anchored to the dog container (no layout shift) */}
+                <div className="absolute top-[18%] left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                  <span
+                    className="
+                      text-cyan-200/70
+                      text-sm sm:text-base
+                      font-extrabold
+                      tracking-[0.45em]
+                      uppercase
+                      select-none
+                      whitespace-nowrap
+                    "
+                    style={{ textShadow: "0 0 20px rgba(34,211,238,0.45)" }}
+                  >
+                    CONTROL&nbsp;YOUR&nbsp;GAME
+                  </span>
+                </div>
+
                 <div
                   className="absolute -inset-16 rounded-full blur-3xl opacity-35"
                   style={{
@@ -150,7 +150,6 @@ const Home = () => {
                 </span>
               </div>
             </div>
-
           </div>
         </section>
       </main>

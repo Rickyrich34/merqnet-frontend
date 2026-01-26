@@ -1,8 +1,28 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Plus, Search, ReceiptText } from "lucide-react";
+import {
+  ChevronLeft,
+  Plus,
+  Search,
+  ReceiptText,
+  RefreshCcw,
+  Sparkles,
+  Wallet,
+  BadgeDollarSign,
+} from "lucide-react";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+/* ----------------------------- API BASE ----------------------------- */
+const API_BASE_URL = (() => {
+  const raw = import.meta.env.VITE_API_URL || "";
+  const trimmed = typeof raw === "string" ? raw.replace(/\/$/, "") : "";
+  if (trimmed) return trimmed;
+
+  // DEV fallback only (local dev)
+  if (import.meta.env.DEV) return "http://localhost:5000";
+
+  // In prod, don't guess
+  return "";
+})();
 
 /* ----------------------------- AUTH HELPERS ----------------------------- */
 function getToken() {
@@ -39,38 +59,6 @@ function fmtQty(v) {
   return n.toLocaleString();
 }
 
-function buildShippingText(req) {
-  const s = req?.shippingAddress || req?.shipping || req?.shipTo || null;
-  if (!s || typeof s !== "object") return "Not provided";
-
-  const street = s.street || s.streetAddress || "";
-  const city = s.city || "";
-  const state = s.state || "";
-  const country = s.country || "";
-  const postalCode = s.postalCode || s.zip || "";
-
-  const parts1 = [city, state].filter(Boolean).join(", ");
-  const parts2 = [country, postalCode].filter(Boolean).join(" ");
-  const compact = [parts1, parts2].filter(Boolean).join(" • ");
-  const full = [street, compact].filter(Boolean).join(" — ");
-
-  return full || compact || "Not provided";
-}
-
-function getBuyerLabel(req) {
-  const b = req?.buyer || req?.client || req?.clientID || req?.user || null;
-
-  if (typeof b === "string") return b;
-  if (b && typeof b === "object") {
-    const first = b.firstName || b.firstname || "";
-    const last = b.lastName || b.lastname || "";
-    const full = [first, last].filter(Boolean).join(" ").trim();
-    return full || b.email || b.username || b.name || "Buyer";
-  }
-
-  return req?.buyerName || req?.clientName || req?.email || "Buyer";
-}
-
 function getCategory(req) {
   return req?.category || req?.type || "Other";
 }
@@ -84,16 +72,13 @@ function getQuantity(req) {
 }
 
 /**
- * IMPORTANT:
  * BuyerDashboard MUST NOT show completed/paid/closed/expired requests.
- * This function tries multiple common fields so it works with your backend
- * even if naming differs across endpoints.
+ * Works across multiple naming conventions.
  */
 function isExpiredRequest(r) {
   const status = String(r?.status || r?.requestStatus || "").toLowerCase();
   const paymentStatus = String(r?.paymentStatus || "").toLowerCase();
 
-  // Strong "paid/completed" signals
   const paidFlag = r?.isPaid === true || r?.paid === true;
   const hasReceipt = Boolean(r?.receiptId || r?.receiptURL || r?.receiptUrl);
 
@@ -110,8 +95,12 @@ function isExpiredRequest(r) {
   );
 }
 
-/* ----------------------------- API CALLS ----------------------------- */
+/* ----------------------------- API HELPERS ----------------------------- */
 async function apiGet(path) {
+  if (!API_BASE_URL) {
+    throw new Error("Missing API base URL (VITE_API_URL).");
+  }
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
@@ -124,7 +113,34 @@ async function apiGet(path) {
     const msg = data?.message || `Request failed (${res.status})`;
     throw new Error(msg);
   }
+
   return res.json();
+}
+
+/**
+ * Offers can be "bids". Backends often vary on route naming.
+ * We try multiple endpoints safely and take the first one that works.
+ */
+async function apiGetOffersByRequestId(reqId) {
+  const candidates = [
+    `/api/bids/request/${reqId}`,
+    `/api/bids/requests/${reqId}`,
+    `/api/bids/byRequest/${reqId}`,
+    `/api/bids/forRequest/${reqId}`,
+  ];
+
+  let lastErr = null;
+
+  for (const path of candidates) {
+    try {
+      const data = await apiGet(path);
+      return data;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr || new Error("Could not load offers.");
 }
 
 /* ----------------------------- COMPONENT ----------------------------- */
@@ -135,81 +151,102 @@ export default function BuyerDashboard() {
   const token = getToken();
 
   const [requests, setRequests] = useState([]);
-  const [offersMap, setOffersMap] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(true);
   const [query, setQuery] = useState("");
+
+  // offersMap[reqId] = { status: "idle|loading|ok|err", offersCount, lowestOffer }
+  const [offersMap, setOffersMap] = useState({});
+
+  const [errorTop, setErrorTop] = useState("");
 
   useEffect(() => {
     if (!token || !userId) navigate("/login");
   }, [token, userId, navigate]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadRequests = useCallback(async () => {
+    try {
+      setErrorTop("");
+      setLoadingRequests(true);
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await apiGet(`/api/requests/buyer/${userId}`);
-        if (cancelled) return;
+      const data = await apiGet(`/api/requests/buyer/${userId}`);
+      const list = Array.isArray(data) ? data : data?.requests || [];
 
-        const list = Array.isArray(data) ? data : data?.requests || [];
-        setRequests(list);
-      } catch (err) {
-        console.error("BuyerDashboard load error:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    if (token && userId) load();
-    return () => (cancelled = true);
-  }, [token, userId]);
+      setRequests(list);
+    } catch (err) {
+      console.error("BuyerDashboard load error:", err);
+      setErrorTop(err?.message || "Failed to load requests.");
+      setRequests([]);
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (token && userId) loadRequests();
+  }, [token, userId, loadRequests]);
 
-    const loadOffersFor = async (reqId) => {
-      try {
-        const data = await apiGet(`/api/bids/request/${reqId}`);
-        if (cancelled) return;
+  const loadOffersFor = useCallback(async (reqId) => {
+    setOffersMap((prev) => ({
+      ...prev,
+      [reqId]: { ...(prev[reqId] || {}), status: "loading" },
+    }));
 
-        const bids = Array.isArray(data) ? data : data?.bids || [];
-        const numericOffers = bids
-          .map((b) => safeNum(b?.totalPrice ?? b?.totalprice ?? b?.amount ?? b?.price))
-          .filter((n) => n !== null);
+    try {
+      const data = await apiGetOffersByRequestId(reqId);
 
-        const lowest = numericOffers.length ? Math.min(...numericOffers) : null;
+      const bids =
+        (Array.isArray(data) && data) ||
+        data?.bids ||
+        data?.offers ||
+        data?.data ||
+        [];
 
-        setOffersMap((prev) => ({
-          ...prev,
-          [reqId]: { lowestOffer: lowest, offersCount: bids.length },
-        }));
-      } catch {
-        if (cancelled) return;
-        setOffersMap((prev) => ({
-          ...prev,
-          [reqId]: { lowestOffer: null, offersCount: 0 },
-        }));
-      }
-    };
+      const arr = Array.isArray(bids) ? bids : [];
 
+      const numericOffers = arr
+        .map((b) =>
+          safeNum(
+            b?.totalPrice ??
+              b?.totalprice ??
+              b?.amount ??
+              b?.price ??
+              b?.bidAmount ??
+              b?.offerAmount
+          )
+        )
+        .filter((n) => n !== null);
+
+      const lowest = numericOffers.length ? Math.min(...numericOffers) : null;
+
+      setOffersMap((prev) => ({
+        ...prev,
+        [reqId]: { status: "ok", offersCount: arr.length, lowestOffer: lowest },
+      }));
+    } catch (e) {
+      setOffersMap((prev) => ({
+        ...prev,
+        [reqId]: { status: "err", offersCount: 0, lowestOffer: null },
+      }));
+    }
+  }, []);
+
+  // Load offers for each ACTIVE request
+  useEffect(() => {
     if (!requests?.length) return;
 
-    // Keep your existing behavior: load offers info for each request
-    // (We don't break anything here.)
-    requests.forEach((r) => {
+    const active = requests.filter((r) => !isExpiredRequest(r));
+    active.forEach((r) => {
       const rid = normalizeId(r?._id || r?.id);
-      if (rid) loadOffersFor(rid);
+      if (!rid) return;
+
+      // Don’t spam reload if already loaded
+      if (offersMap[rid]?.status === "ok") return;
+
+      loadOffersFor(rid);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requests, loadOffersFor]);
 
-    return () => (cancelled = true);
-  }, [requests]);
-
-  /**
-   * CORE FIX:
-   * We only show ACTIVE requests (not paid/closed/completed/expired).
-   * Then search applies on top of that.
-   */
   const filtered = useMemo(() => {
     const activeRequests = (requests || []).filter((r) => !isExpiredRequest(r));
 
@@ -224,53 +261,82 @@ export default function BuyerDashboard() {
     });
   }, [requests, query]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Loading…
-      </div>
-    );
-  }
+  const totalActive = filtered.length;
 
   return (
-    <div className="min-h-screen bg-black text-white pt-36 pb-20">
-      <div className="max-w-5xl mx-auto px-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-black text-white pt-28 sm:pt-32 pb-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        {/* Top bar */}
+        <div className="flex items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
             <button
               onClick={() => navigate("/dashboard")}
-              className="rounded-2xl border border-white/15 bg-[#0B001F]/85 hover:bg-[#0B001F] transition p-2.5"
+              className="shrink-0 rounded-2xl border border-white/10 bg-[#0B001F]/75 hover:bg-[#0B001F] transition p-2.5"
+              aria-label="Back to Dashboard"
             >
               <ChevronLeft className="w-5 h-5 text-white/80" />
             </button>
 
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold">Buyer Dashboard</h1>
-              <p className="text-xs sm:text-sm text-white/55 mt-1">
-                Track your requests and choose your winning offer when ready.
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Buyer Dashboard
+              </h1>
+              <p className="text-xs sm:text-sm text-white/55 mt-1 max-w-[34rem]">
+                Track your requests and review offers. You choose the winning offer when you’re ready.
               </p>
             </div>
           </div>
 
-          {/* Create New Request (NO hyphens in route) */}
-          <button
-            onClick={() => navigate("/createrequest")}
-            className="flex items-center gap-2 rounded-2xl border border-cyan-500/30 bg-[#0B001F]/85 hover:bg-[#0B001F] transition px-4 py-2.5"
-          >
-            <Plus className="w-5 h-5 text-cyan-200" />
-            <span className="text-sm font-semibold text-cyan-200">Create New Request</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadRequests}
+              className="rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition px-3 py-2 flex items-center gap-2"
+              title="Refresh"
+            >
+              <RefreshCcw className="w-4 h-4 text-white/70" />
+              <span className="text-sm text-white/80 hidden sm:inline">Refresh</span>
+            </button>
+
+            <button
+              onClick={() => navigate("/createrequest")}
+              className="rounded-2xl border border-cyan-500/25 bg-[#0B001F]/85 hover:bg-[#0B001F] transition px-4 py-2.5 flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5 text-cyan-200" />
+              <span className="text-sm font-semibold text-cyan-200">Create Request</span>
+            </button>
+          </div>
         </div>
 
-        <div className="mt-8 bg-[#0B001F]/80 border border-cyan-500/25 rounded-3xl p-5 sm:p-6">
+        {/* Prod API warning (only if missing) */}
+        {!import.meta.env.DEV && !API_BASE_URL && (
+          <div className="mt-5 rounded-2xl border border-yellow-400/25 bg-yellow-400/10 p-4 text-sm text-yellow-100">
+            Missing <span className="font-bold">VITE_API_URL</span> in production. Offers won’t load until it’s set in Railway variables.
+          </div>
+        )}
+
+        {errorTop && (
+          <div className="mt-5 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">
+            {errorTop}
+          </div>
+        )}
+
+        {/* Search card */}
+        <div className="mt-6 rounded-3xl border border-cyan-500/20 bg-[#0B001F]/70 p-5 sm:p-6 shadow-[0_0_30px_rgba(100,200,255,0.08)]">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-cyan-100">Find a request</h2>
-              <p className="text-xs text-white/55 mt-1">Search your requests by name, ID, or category.</p>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-2xl bg-white/5 border border-white/10 p-2.5">
+                <Sparkles className="w-5 h-5 text-cyan-200" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-cyan-100">Find a request</h2>
+                <p className="text-xs text-white/55 mt-1">
+                  Search by request ID, product name, or category.
+                </p>
+              </div>
             </div>
 
             <div className="text-xs text-white/50">
-              Showing <span className="text-white/80">{filtered.length}</span> / {requests.length}
+              Showing <span className="text-white/85">{totalActive}</span> active
             </div>
           </div>
 
@@ -280,45 +346,113 @@ export default function BuyerDashboard() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search my requests…"
-              className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 outline-none"
+              className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-10 pr-3 outline-none focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-400/10"
             />
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-4">
-          {filtered.length === 0 ? (
-            <div className="border border-white/10 rounded-2xl p-6 bg-[#0B001F]/60 text-white/70 text-center">
+        {/* Requests list */}
+        <div className="mt-6 grid grid-cols-1 gap-4">
+          {loadingRequests ? (
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-white/70">
+              Loading requests…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-3xl border border-white/10 bg-[#0B001F]/55 p-7 text-center text-white/70">
               No active requests right now. Paid/closed/expired requests won’t show here.
             </div>
           ) : (
             filtered.map((r) => {
               const rid = normalizeId(r?._id || r?.id);
-              const info = offersMap[rid] || { offersCount: 0, lowestOffer: null };
+              const info = offersMap[rid] || { status: "idle", offersCount: 0, lowestOffer: null };
+
+              const offersLabel =
+                info.status === "loading"
+                  ? "Loading…"
+                  : `${info.offersCount || 0}`;
+
+              const lowestLabel =
+                info.status === "loading"
+                  ? "…"
+                  : info.lowestOffer !== null
+                    ? fmtMoney(info.lowestOffer)
+                    : "—";
 
               return (
                 <div
                   key={rid}
-                  className="border border-white/10 rounded-2xl p-4 bg-[#0B001F]/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  className="rounded-3xl border border-white/10 bg-[#0B001F]/60 p-4 sm:p-5
+                             shadow-[0_0_30px_rgba(170,90,255,0.08)]"
                 >
-                  <div>
-                    <div className="font-semibold">{getTitle(r)}</div>
-                    <div className="text-xs text-white/50">Category: {getCategory(r)}</div>
-                    <div className="text-xs text-white/50">Qty: {fmtQty(getQuantity(r))}</div>
-                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    {/* Left */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="text-base sm:text-lg font-extrabold truncate">
+                          {getTitle(r)}
+                        </div>
+                        <span className="text-[11px] px-2 py-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                          {getCategory(r)}
+                        </span>
+                      </div>
 
-                  <div className="flex items-center gap-6">
-                    <div className="text-xs text-white/60">Offers: {info.offersCount}</div>
-                    <div className="text-sm text-cyan-200 font-semibold">
-                      {info.lowestOffer !== null ? fmtMoney(info.lowestOffer) : "—"}
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/60">
+                        <span className="px-2 py-1 rounded-full border border-white/10 bg-white/5">
+                          Qty: <span className="text-white/80">{fmtQty(getQuantity(r))}</span>
+                        </span>
+                        <span className="px-2 py-1 rounded-full border border-white/10 bg-white/5">
+                          ID: <span className="text-white/70">{String(rid).slice(-8)}</span>
+                        </span>
+                      </div>
                     </div>
 
-                    <button
-                      onClick={() => navigate(`/bids/${rid}`)}
-                      className="flex items-center gap-1 text-sm px-4 py-2 rounded-xl font-bold text-black bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 transition shadow-[0_8px_25px_rgba(251,191,36,0.45)]"
-                    >
-                      <ReceiptText className="w-4 h-4" />
-                      View bids
-                    </button>
+                    {/* Right */}
+                    <div className="flex flex-col sm:items-end gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                          <div className="flex items-center gap-2 text-xs text-white/60">
+                            <Wallet className="w-4 h-4 text-white/60" />
+                            Offers
+                          </div>
+                          <div className="text-sm font-bold text-white/90">{offersLabel}</div>
+                        </div>
+
+                        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2">
+                          <div className="flex items-center gap-2 text-xs text-cyan-200">
+                            <BadgeDollarSign className="w-4 h-4 text-cyan-200" />
+                            Lowest
+                          </div>
+                          <div className="text-sm font-extrabold text-cyan-100">{lowestLabel}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {info.status === "err" && (
+                          <button
+                            onClick={() => loadOffersFor(rid)}
+                            className="text-xs px-3 py-2 rounded-xl border border-red-400/20 bg-red-400/10 text-red-100 hover:bg-red-400/15 transition"
+                          >
+                            Retry offers
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => navigate(`/bids/${rid}`)}
+                          className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-2xl font-extrabold text-black
+                                     bg-gradient-to-r from-yellow-400 to-amber-500
+                                     hover:from-yellow-300 hover:to-amber-400 transition
+                                     shadow-[0_10px_30px_rgba(251,191,36,0.35)]"
+                        >
+                          <ReceiptText className="w-4 h-4" />
+                          View offers
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tiny helper line */}
+                  <div className="mt-3 text-[11px] text-white/35">
+                    Offers load from your bids endpoint. If it stays 0, your backend route name might differ — this UI now tries multiple common routes.
                   </div>
                 </div>
               );

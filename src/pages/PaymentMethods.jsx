@@ -11,7 +11,9 @@ import Galactic1 from "../assets/Galactic1.png";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
-const API = "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL;
+
+
 
 // ✅ Put this in .env and restart Vite:
 // VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...

@@ -12,7 +12,12 @@ import {
 
 // Stripe
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  CardElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
 
 /* ============================
    API helpers
@@ -113,12 +118,20 @@ export default function PaymentMethods() {
 
   // Show non-stripe version if key missing
   if (!stripePromise) {
-    return <PaymentMethodsNoStripe bidIdFromRoute={bidIdFromRoute} navigate={navigate} />;
+    return (
+      <PaymentMethodsNoStripe
+        bidIdFromRoute={bidIdFromRoute}
+        navigate={navigate}
+      />
+    );
   }
 
   return (
     <Elements stripe={stripePromise}>
-      <PaymentMethodsStripe bidIdFromRoute={bidIdFromRoute} navigate={navigate} />
+      <PaymentMethodsStripe
+        bidIdFromRoute={bidIdFromRoute}
+        navigate={navigate}
+      />
     </Elements>
   );
 }
@@ -295,9 +308,7 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
           ) : null}
 
           {!loadingCards && cards.length === 0 ? (
-            <div className="mt-4 text-white/60 text-sm">
-              No cards saved.
-            </div>
+            <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
           ) : null}
 
           <div className="mt-4 grid gap-3">
@@ -315,8 +326,14 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                       {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
                     </div>
                     <div className="text-xs text-white/60">
-                      Exp {(c.exp_month ?? c.expMonth) ? String(c.exp_month ?? c.expMonth).padStart(2, "0") : "--"}/
-                      {(c.exp_year ?? c.expYear) ? String(c.exp_year ?? c.expYear).slice(-2) : "--"}
+                      Exp{" "}
+                      {(c.exp_month ?? c.expMonth)
+                        ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
+                        : "--"}
+                      /
+                      {(c.exp_year ?? c.expYear)
+                        ? String(c.exp_year ?? c.expYear).slice(-2)
+                        : "--"}
                       {c.isDefault ? " • Default" : ""}
                     </div>
                   </div>
@@ -353,9 +370,12 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
 
           {/* Add Card note */}
           <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-            <div className="text-white/80 text-sm font-semibold">Add a new card</div>
+            <div className="text-white/80 text-sm font-semibold">
+              Add a new card
+            </div>
             <div className="mt-2 text-xs text-white/60">
-              Stripe is not available (missing publishable key). Add cards from a Stripe-enabled build.
+              Stripe is not available (missing publishable key). Add cards from a
+              Stripe-enabled build.
             </div>
           </div>
         </div>
@@ -369,15 +389,20 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                 You must have a default card saved to complete payment.
               </div>
 
-              {summaryErr ? <div className="mt-3 text-red-400 text-sm">{summaryErr}</div> : null}
-              {payErr ? <div className="mt-3 text-red-400 text-sm">{payErr}</div> : null}
-              {payOk ? <div className="mt-3 text-emerald-300 text-sm">{payOk}</div> : null}
+              {summaryErr ? (
+                <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
+              ) : null}
+              {payErr ? (
+                <div className="mt-3 text-red-400 text-sm">{payErr}</div>
+              ) : null}
+              {payOk ? (
+                <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
+              ) : null}
 
-              {/* ✅ FIX: do NOT over-block Pay Now. Backend validates default card. */}
               <div className="mt-4 hidden md:block">
                 <button
                   onClick={payNow}
-                  disabled={paying || summaryLoading || !bid || !request || !defaultCard}
+                  disabled={paying || summaryLoading || !bid || !request}
                   className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                 >
                   {paying ? "Processing..." : "Pay Now"}
@@ -390,7 +415,7 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
               <div className="max-w-5xl mx-auto px-4 pt-3 pb-[env(safe-area-inset-bottom)]">
                 <button
                   onClick={payNow}
-                  disabled={paying || summaryLoading || !bid || !request || !defaultCard}
+                  disabled={paying || summaryLoading || !bid || !request}
                   className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                 >
                   {paying ? "Processing..." : "Pay Now"}
@@ -500,7 +525,8 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
         card: cardElement,
       });
 
-      if (error) throw new Error(error.message || "Failed to create payment method");
+      if (error)
+        throw new Error(error.message || "Failed to create payment method");
       if (!paymentMethod?.id) throw new Error("Missing paymentMethod id");
 
       await apiAddCard(paymentMethod.id);
@@ -600,9 +626,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
           ) : null}
 
           {!loadingCards && cards.length === 0 ? (
-            <div className="mt-4 text-white/60 text-sm">
-              No cards saved.
-            </div>
+            <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
           ) : null}
 
           <div className="mt-4 grid gap-3">
@@ -620,8 +644,14 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                       {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
                     </div>
                     <div className="text-xs text-white/60">
-                      Exp {(c.exp_month ?? c.expMonth) ? String(c.exp_month ?? c.expMonth).padStart(2, "0") : "--"}/
-                      {(c.exp_year ?? c.expYear) ? String(c.exp_year ?? c.expYear).slice(-2) : "--"}
+                      Exp{" "}
+                      {(c.exp_month ?? c.expMonth)
+                        ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
+                        : "--"}
+                      /
+                      {(c.exp_year ?? c.expYear)
+                        ? String(c.exp_year ?? c.expYear).slice(-2)
+                        : "--"}
                       {c.isDefault ? " • Default" : ""}
                     </div>
                   </div>
@@ -658,7 +688,9 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
 
           {/* Add Card form */}
           <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-            <div className="text-white/80 text-sm font-semibold">Add a new card</div>
+            <div className="text-white/80 text-sm font-semibold">
+              Add a new card
+            </div>
             <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
               <CardElement
                 options={{
@@ -692,15 +724,20 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                 You must have a default card saved to complete payment.
               </div>
 
-              {summaryErr ? <div className="mt-3 text-red-400 text-sm">{summaryErr}</div> : null}
-              {payErr ? <div className="mt-3 text-red-400 text-sm">{payErr}</div> : null}
-              {payOk ? <div className="mt-3 text-emerald-300 text-sm">{payOk}</div> : null}
+              {summaryErr ? (
+                <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
+              ) : null}
+              {payErr ? (
+                <div className="mt-3 text-red-400 text-sm">{payErr}</div>
+              ) : null}
+              {payOk ? (
+                <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
+              ) : null}
 
-              {/* ✅ FIX: do NOT over-block Pay Now. Backend validates default card. */}
               <div className="mt-4 hidden md:block">
                 <button
                   onClick={payNow}
-                  disabled={paying || summaryLoading || !bid || !request || !defaultCard}
+                  disabled={paying || summaryLoading || !bid || !request}
                   className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                 >
                   {paying ? "Processing..." : "Pay Now"}
@@ -713,7 +750,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
               <div className="max-w-5xl mx-auto px-4 pt-3 pb-[env(safe-area-inset-bottom)]">
                 <button
                   onClick={payNow}
-                  disabled={paying || summaryLoading || !bid || !request || !defaultCard}
+                  disabled={paying || summaryLoading || !bid || !request}
                   className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                 >
                   {paying ? "Processing..." : "Pay Now"}

@@ -22,6 +22,30 @@ const Navbar = () => {
 
   const getUserId = () => localStorage.getItem("userId") || "";
 
+  // ✅ Safe JWT email extraction (no deps, no breaking)
+  const extractEmailFromToken = (token) => {
+    try {
+      if (!token || typeof token !== "string") return "";
+      const parts = token.split(".");
+      if (parts.length !== 3) return "";
+      const payload = parts[1];
+
+      // base64url -> base64
+      const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        atob(b64)
+          .split("")
+          .map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, "0")}`)
+          .join("")
+      );
+
+      const data = JSON.parse(json);
+      return data?.email || data?.user?.email || data?.profile?.email || "";
+    } catch {
+      return "";
+    }
+  };
+
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
@@ -32,6 +56,24 @@ const Navbar = () => {
 
     setIsLoggedIn(!!token);
 
+    // ✅ 1) Always try localStorage first (fast + works even if API is empty)
+    const storedEmail = localStorage.getItem("userEmail") || "";
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+      return;
+    }
+
+    // ✅ 2) Try to pull email from JWT token payload (if available)
+    if (token) {
+      const tokenEmail = extractEmailFromToken(token);
+      if (tokenEmail) {
+        setUserEmail(tokenEmail);
+        localStorage.setItem("userEmail", tokenEmail);
+        return;
+      }
+    }
+
+    // ✅ 3) Fallback: your existing profile fetch
     if (!token || !userId || !API) return;
 
     fetch(`${API}/api/users/profile/${userId}`, {
@@ -42,8 +84,7 @@ const Navbar = () => {
         return res.json();
       })
       .then((data) => {
-        const email =
-          data?.email || data?.user?.email || data?.profile?.email || "";
+        const email = data?.email || data?.user?.email || data?.profile?.email || "";
         if (email) {
           setUserEmail(email);
           localStorage.setItem("userEmail", email);
@@ -76,12 +117,8 @@ const Navbar = () => {
       className="fixed top-0 left-0 w-full z-50 bg-[#070615]/90 backdrop-blur-md"
     >
       <div className="flex justify-between items-center px-4 sm:px-10 py-3 sm:py-4">
-        {/* Left: Logo + Title + Email */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link
-            to={isLoggedIn ? "/dashboard" : "/"}
-            className="flex items-center gap-3 min-w-0"
-          >
+          <Link to={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0 flex items-center">
               <img
                 src={logopic2}
@@ -115,7 +152,6 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Desktop links */}
         <div className="hidden sm:flex items-center gap-4 sm:gap-8">
           {!isLoggedIn ? (
             <>
@@ -160,7 +196,6 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile hamburger */}
         <button
           type="button"
           className="sm:hidden inline-flex items-center justify-center rounded-xl p-2 border border-white/10 bg-white/5 hover:bg-white/10 transition"
@@ -168,15 +203,10 @@ const Navbar = () => {
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
         >
-          {mobileOpen ? (
-            <X className="text-white" size={22} />
-          ) : (
-            <Menu className="text-white" size={22} />
-          )}
+          {mobileOpen ? <X className="text-white" size={22} /> : <Menu className="text-white" size={22} />}
         </button>
       </div>
 
-      {/* Mobile dropdown */}
       {mobileOpen && (
         <div className="sm:hidden px-3 pb-4">
           <div className="rounded-2xl border border-white/10 bg-[#060417]/95 backdrop-blur-md shadow-[0_0_25px_rgba(160,90,255,0.25)] overflow-hidden">
@@ -213,10 +243,7 @@ const Navbar = () => {
                   Profile
                 </Link>
 
-                <button
-                  onClick={handleLogout}
-                  className={`${mobileLink} text-red-300`}
-                >
+                <button onClick={handleLogout} className={`${mobileLink} text-red-300`}>
                   Logout
                 </button>
               </div>

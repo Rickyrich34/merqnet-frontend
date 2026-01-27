@@ -1,28 +1,17 @@
 console.log("STRIPE ENV =", import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  ChevronLeft,
-  CreditCard,
-  Trash2,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ChevronLeft, CreditCard, Trash2, CheckCircle2, Loader2 } from "lucide-react";
 
 import Galactic1 from "../assets/Galactic1.png";
 
 // Stripe
 import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  CardElement,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js";
+import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 /* ============================
-   API helpers
+   API helpers (MUST match backend)
 ============================ */
 const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
@@ -39,41 +28,35 @@ async function apiGetCards() {
   return data?.cards || [];
 }
 
-async function apiAddCard(paymentMethodId) {
+// Backend expects: { tokenId, makeDefault }
+async function apiAddCardToken(tokenId, makeDefault) {
   const res = await fetch(`${API_BASE}/api/payments/cards`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ paymentMethodId }),
+    body: JSON.stringify({ tokenId, makeDefault: !!makeDefault }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || "Failed to add card");
   return data;
 }
 
-async function apiSetDefault(card) {
-  const res = await fetch(`${API_BASE}/api/payments/cards/default`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
-    // ✅ FIX: supports legacy stripeSourceId (card_), new stripePaymentMethodId (pm_), and mongo _id fallback
-    body: JSON.stringify({
-      stripePaymentMethodId: card.stripePaymentMethodId || null,
-      stripeSourceId: card.stripeSourceId || null,
-      cardId: card._id,
-    }),
+// Backend route: PATCH /cards/:cardId/default, controller treats :cardId as last4
+async function apiSetDefaultByLast4(last4) {
+  const res = await fetch(`${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}/default`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${getToken()}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || "Failed to set default");
   return data;
 }
 
-async function apiDeleteCard(card) {
-  const res = await fetch(`${API_BASE}/api/payments/cards/${card._id}`, {
+// Backend route: DELETE /cards/:cardId, controller treats :cardId as last4
+async function apiDeleteByLast4(last4) {
+  const res = await fetch(`${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${getToken()}` },
   });
@@ -82,30 +65,15 @@ async function apiDeleteCard(card) {
   return data;
 }
 
-async function apiGetSummary(bidId) {
-  const res = await fetch(`${API_BASE}/api/payments/summary/${bidId}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-
-  // ✅ FIX: If backend doesn't have this route yet, don't break the page.
-  // We keep the same endpoint and same fields—just avoid hard failing on 404.
-  if (res.status === 404) {
-    return { bid: null, request: null, message: "summary route not found" };
-  }
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.message || "Failed to load summary");
-  return data;
-}
-
-async function apiPayNow(bidId) {
+// Backend requires: { requestId, bidId }
+async function apiPayNow({ requestId, bidId }) {
   const res = await fetch(`${API_BASE}/api/payments/pay`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
-    body: JSON.stringify({ bidId }),
+    body: JSON.stringify({ requestId, bidId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || "Payment failed");
@@ -118,6 +86,20 @@ async function apiPayNow(bidId) {
 export default function PaymentMethods() {
   const navigate = useNavigate();
   const { bidId: bidIdFromRoute } = useParams();
+  const location = useLocation();
+
+  // requestId must come from navigation state OR querystring (no inventing)
+  const requestIdFromState = location?.state?.requestId || null;
+  const requestIdFromQuery = useMemo(() => {
+    try {
+      const sp = new URLSearchParams(location.search || "");
+      return sp.get("requestId");
+    } catch {
+      return null;
+    }
+  }, [location.search]);
+
+  const requestId = requestIdFromState || requestIdFromQuery || null;
 
   const stripePk = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
   const stripePromise = useMemo(() => {
@@ -125,341 +107,47 @@ export default function PaymentMethods() {
     return loadStripe(stripePk);
   }, [stripePk]);
 
-  // Show non-stripe version if key missing
   if (!stripePromise) {
     return (
-      <PaymentMethodsNoStripe
-        bidIdFromRoute={bidIdFromRoute}
-        navigate={navigate}
-      />
+      <div
+        className="min-h-screen w-full bg-cover bg-center bg-fixed"
+        style={{ backgroundImage: `url(${Galactic1})` }}
+      >
+        <div className="min-h-screen w-full bg-black/50 pb-24 md:pb-10">
+          <div className="max-w-5xl mx-auto px-4 py-6">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-2 text-white/80 hover:text-white transition"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span className="text-sm font-semibold">Back</span>
+              </button>
+              <div className="text-white font-bold tracking-wide">Payment Methods</div>
+              <div className="w-20" />
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-6 text-white/80">
+              Stripe publishable key is missing. Set VITE_STRIPE_PUBLISHABLE_KEY.
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
     <Elements stripe={stripePromise}>
-      <PaymentMethodsStripe
-        bidIdFromRoute={bidIdFromRoute}
-        navigate={navigate}
-      />
+      <PaymentMethodsStripe bidIdFromRoute={bidIdFromRoute} requestId={requestId} />
     </Elements>
-  );
-}
-
-/* ============================
-   No-Stripe fallback component
-============================ */
-function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
-  const [cards, setCards] = useState([]);
-  const [loadingCards, setLoadingCards] = useState(true);
-  const [cardsErr, setCardsErr] = useState("");
-
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryErr, setSummaryErr] = useState("");
-  const [bid, setBid] = useState(null);
-  const [request, setRequest] = useState(null);
-
-  const [busyId, setBusyId] = useState("");
-  const [paying, setPaying] = useState(false);
-  const [payErr, setPayErr] = useState("");
-  const [payOk, setPayOk] = useState("");
-
-  const defaultCard = useMemo(
-    () => cards.find((c) => c.isDefault) || null,
-    [cards]
-  );
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadCards() {
-      try {
-        setLoadingCards(true);
-        setCardsErr("");
-        const list = await apiGetCards();
-        if (!alive) return;
-        setCards(list);
-      } catch (e) {
-        if (!alive) return;
-        setCardsErr(String(e?.message || "Failed to load cards"));
-      } finally {
-        if (!alive) return;
-        setLoadingCards(false);
-      }
-    }
-
-    loadCards();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadSummary() {
-      if (!bidIdFromRoute) return;
-      try {
-        setSummaryLoading(true);
-        setSummaryErr("");
-
-        const data = await apiGetSummary(bidIdFromRoute);
-        if (!alive) return;
-
-        // If summary route doesn't exist (404), we simply keep bid/request null and don't show fatal error.
-        if (data?.message === "summary route not found") {
-          setBid(null);
-          setRequest(null);
-          setSummaryErr(""); // ✅ do not scare the user with backend route mismatch
-          return;
-        }
-
-        setBid(data?.bid || null);
-        setRequest(data?.request || null);
-      } catch (e) {
-        if (!alive) return;
-        setSummaryErr(String(e?.message || "Failed to load summary"));
-      } finally {
-        if (!alive) return;
-        setSummaryLoading(false);
-      }
-    }
-    loadSummary();
-    return () => {
-      alive = false;
-    };
-  }, [bidIdFromRoute]);
-
-  async function setDefault(card) {
-    try {
-      setBusyId(card._id);
-      setCardsErr("");
-      await apiSetDefault(card);
-      const refreshed = await apiGetCards();
-      setCards(refreshed);
-    } catch (e) {
-      setCardsErr(String(e?.message || "Failed to set default"));
-    } finally {
-      setBusyId("");
-    }
-  }
-
-  async function del(card) {
-    try {
-      setBusyId(card._id);
-      setCardsErr("");
-      await apiDeleteCard(card);
-      const refreshed = await apiGetCards();
-      setCards(refreshed);
-    } catch (e) {
-      setCardsErr(String(e?.message || "Failed to delete"));
-    } finally {
-      setBusyId("");
-    }
-  }
-
-  async function payNow() {
-    if (!bidIdFromRoute) return;
-    setPayErr("");
-    setPayOk("");
-    try {
-      setPaying(true);
-      const data = await apiPayNow(bidIdFromRoute);
-      setPayOk(data?.message || "Payment successful");
-      if (data?.receiptId) {
-        setTimeout(() => navigate(`/receipt/${data.receiptId}`), 600);
-      }
-    } catch (e) {
-      setPayErr(String(e?.message || "Payment failed"));
-    } finally {
-      setPaying(false);
-    }
-  }
-
-  return (
-    <div
-      className="min-h-screen w-full bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: `url(${Galactic1})` }}
-    >
-      <div className="min-h-screen w-full bg-black/40 backdrop-blur-[1px] pb-24 md:pb-10">
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate(-1)}
-              className="inline-flex items-center gap-2 text-white/80 hover:text-white transition"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm font-semibold">Back</span>
-            </button>
-
-            <div className="text-white font-bold tracking-wide">
-              Payment Methods
-            </div>
-
-            <div className="w-20" />
-          </div>
-
-          {/* Cards */}
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-6">
-            <div className="flex items-center gap-2 text-white/90 font-semibold">
-              <CreditCard className="w-5 h-5" />
-              Saved Cards
-            </div>
-
-            {loadingCards ? (
-              <div className="mt-4 text-white/70 text-sm flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Loading cards...
-              </div>
-            ) : null}
-
-            {cardsErr ? (
-              <div className="mt-4 text-red-400 text-sm">{cardsErr}</div>
-            ) : null}
-
-            {!loadingCards && cards.length === 0 ? (
-              <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
-            ) : null}
-
-            <div className="mt-4 grid gap-3">
-              {cards.map((c) => (
-                <div
-                  key={c._id}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b0a1c]/60 p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-white/80" />
-                    </div>
-                    <div>
-                      <div className="text-white/90 text-sm font-semibold">
-                        {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
-                      </div>
-                      <div className="text-xs text-white/60">
-                        Exp{" "}
-                        {(c.exp_month ?? c.expMonth)
-                          ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
-                          : "--"}
-                        /
-                        {(c.exp_year ?? c.expYear)
-                          ? String(c.exp_year ?? c.expYear).slice(-2)
-                          : "--"}
-                        {c.isDefault ? " • Default" : ""}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {!c.isDefault ? (
-                      <button
-                        onClick={() => setDefault(c)}
-                        disabled={busyId === c._id}
-                        className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-xs font-semibold transition disabled:opacity-50"
-                      >
-                        {busyId === c._id ? "..." : "Make Default"}
-                      </button>
-                    ) : (
-                      <div className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Default
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => del(c)}
-                      disabled={busyId === c._id}
-                      className="px-3 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/20 text-red-300 text-xs font-semibold transition disabled:opacity-50"
-                      title="Delete card"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Add Card note */}
-            <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-              <div className="text-white/80 text-sm font-semibold">
-                Add a new card
-              </div>
-              <div className="mt-2 text-xs text-white/60">
-                Stripe is not available (missing publishable key). Add cards from
-                a Stripe-enabled build.
-              </div>
-            </div>
-          </div>
-
-          {/* Pay Now */}
-          {bidIdFromRoute && (
-            <>
-              <div className="rounded-2xl border border-white/20 bg-[#0b0a1c]/88 backdrop-blur-md p-6 mt-6">
-                <div className="text-white/90 font-semibold">Pay Now</div>
-                <div className="mt-2 text-xs text-white/60">
-                  You must have a default card saved to complete payment.
-                </div>
-
-                {summaryErr ? (
-                  <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
-                ) : null}
-                {payErr ? (
-                  <div className="mt-3 text-red-400 text-sm">{payErr}</div>
-                ) : null}
-                {payOk ? (
-                  <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
-                ) : null}
-
-                {/* Desktop button */}
-                <div className="mt-4 hidden md:block">
-                  <button
-                    onClick={payNow}
-                    disabled={
-                      paying ||
-                      summaryLoading ||
-                      !bid ||
-                      !request ||
-                      !defaultCard ||
-                      (!defaultCard.stripeSourceId &&
-                        !defaultCard.stripePaymentMethodId)
-                    }
-                    className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
-                  >
-                    {paying ? "Processing..." : "Pay Now"}
-                  </button>
-                </div>
-              </div>
-
-              {/* ✅ MOBILE FIX: fixed bottom bar so Pay button is ALWAYS visible */}
-              <div className="md:hidden fixed bottom-0 left-0 right-0 z-[9998] border-t border-white/10 bg-[#0b0a1c]/92 backdrop-blur-md">
-                <div className="max-w-5xl mx-auto px-4 pt-3 pb-[env(safe-area-inset-bottom)]">
-                  <button
-                    onClick={payNow}
-                    disabled={
-                      paying ||
-                      summaryLoading ||
-                      !bid ||
-                      !request ||
-                      !defaultCard ||
-                      (!defaultCard.stripeSourceId &&
-                        !defaultCard.stripePaymentMethodId)
-                    }
-                    className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
-                  >
-                    {paying ? "Processing..." : "Pay Now"}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
 /* ============================
    Stripe-enabled component
 ============================ */
-function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
+function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
+  const navigate = useNavigate();
   const stripe = useStripe();
   const elements = useElements();
 
@@ -467,108 +155,60 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
   const [loadingCards, setLoadingCards] = useState(true);
   const [cardsErr, setCardsErr] = useState("");
 
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryErr, setSummaryErr] = useState("");
-  const [bid, setBid] = useState(null);
-  const [request, setRequest] = useState(null);
-
-  const [busyId, setBusyId] = useState("");
+  const [busyKey, setBusyKey] = useState(""); // use last4 or action key
   const [adding, setAdding] = useState(false);
 
   const [paying, setPaying] = useState(false);
   const [payErr, setPayErr] = useState("");
   const [payOk, setPayOk] = useState("");
 
-  const defaultCard = useMemo(
-    () => cards.find((c) => c.isDefault) || null,
-    [cards]
-  );
+  const defaultCard = useMemo(() => cards.find((c) => c.isDefault) || null, [cards]);
+
+  async function refreshCards() {
+    setCardsErr("");
+    setLoadingCards(true);
+    try {
+      const list = await apiGetCards();
+      setCards(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setCardsErr(String(e?.message || "Failed to load cards"));
+      setCards([]);
+    } finally {
+      setLoadingCards(false);
+    }
+  }
 
   useEffect(() => {
-    let alive = true;
-
-    async function loadCards() {
-      try {
-        setLoadingCards(true);
-        setCardsErr("");
-        const list = await apiGetCards();
-        if (!alive) return;
-        setCards(list);
-      } catch (e) {
-        if (!alive) return;
-        setCardsErr(String(e?.message || "Failed to load cards"));
-      } finally {
-        if (!alive) return;
-        setLoadingCards(false);
-      }
-    }
-
-    loadCards();
-    return () => {
-      alive = false;
-    };
+    refreshCards();
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    async function loadSummary() {
-      if (!bidIdFromRoute) return;
-      try {
-        setSummaryLoading(true);
-        setSummaryErr("");
-
-        const data = await apiGetSummary(bidIdFromRoute);
-        if (!alive) return;
-
-        // If summary route doesn't exist (404), we simply keep bid/request null and don't show fatal error.
-        if (data?.message === "summary route not found") {
-          setBid(null);
-          setRequest(null);
-          setSummaryErr(""); // ✅ do not scare the user with backend route mismatch
-          return;
-        }
-
-        setBid(data?.bid || null);
-        setRequest(data?.request || null);
-      } catch (e) {
-        if (!alive) return;
-        setSummaryErr(String(e?.message || "Failed to load summary"));
-      } finally {
-        if (!alive) return;
-        setSummaryLoading(false);
-      }
-    }
-    loadSummary();
-    return () => {
-      alive = false;
-    };
-  }, [bidIdFromRoute]);
-
-  async function addNewCard() {
+  async function addNewCard(makeDefault = true) {
     setCardsErr("");
+    setPayErr("");
+    setPayOk("");
+
     if (!stripe || !elements) {
       setCardsErr("Stripe is not ready yet.");
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      setCardsErr("Card input not found.");
       return;
     }
 
     try {
       setAdding(true);
 
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) throw new Error("Card element not found");
+      // ✅ MUST match backend: tokenId
+      const { token, error } = await stripe.createToken(cardElement);
+      if (error) throw new Error(error.message || "Failed to tokenize card");
+      if (!token?.id) throw new Error("Missing Stripe token id");
 
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: "card",
-        card: cardElement,
-      });
+      await apiAddCardToken(token.id, makeDefault);
 
-      if (error)
-        throw new Error(error.message || "Failed to create payment method");
-      if (!paymentMethod?.id) throw new Error("Missing paymentMethod id");
-
-      await apiAddCard(paymentMethod.id);
-      const refreshed = await apiGetCards();
-      setCards(refreshed);
+      await refreshCards();
       cardElement.clear();
     } catch (e) {
       setCardsErr(String(e?.message || "Failed to add card"));
@@ -578,42 +218,79 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
   }
 
   async function setDefault(card) {
+    setCardsErr("");
+    setPayErr("");
+    setPayOk("");
+
+    const last4 = String(card?.last4 || "");
+    if (!last4) {
+      setCardsErr("Card last4 missing.");
+      return;
+    }
+
     try {
-      setBusyId(card._id);
-      setCardsErr("");
-      await apiSetDefault(card);
-      const refreshed = await apiGetCards();
-      setCards(refreshed);
+      setBusyKey(`default-${last4}`);
+      await apiSetDefaultByLast4(last4);
+      await refreshCards();
     } catch (e) {
       setCardsErr(String(e?.message || "Failed to set default"));
     } finally {
-      setBusyId("");
+      setBusyKey("");
     }
   }
 
   async function del(card) {
+    setCardsErr("");
+    setPayErr("");
+    setPayOk("");
+
+    const last4 = String(card?.last4 || "");
+    if (!last4) {
+      setCardsErr("Card last4 missing.");
+      return;
+    }
+
     try {
-      setBusyId(card._id);
-      setCardsErr("");
-      await apiDeleteCard(card);
-      const refreshed = await apiGetCards();
-      setCards(refreshed);
+      setBusyKey(`delete-${last4}`);
+      await apiDeleteByLast4(last4);
+      await refreshCards();
     } catch (e) {
-      setCardsErr(String(e?.message || "Failed to delete"));
+      setCardsErr(String(e?.message || "Failed to delete card"));
     } finally {
-      setBusyId("");
+      setBusyKey("");
     }
   }
 
   async function payNow() {
-    if (!bidIdFromRoute) return;
     setPayErr("");
     setPayOk("");
 
+    if (!bidIdFromRoute) {
+      setPayErr("Missing bidId in route.");
+      return;
+    }
+    if (!requestId) {
+      setPayErr("Missing requestId. Navigate here with state.requestId or ?requestId=...");
+      return;
+    }
+    if (!defaultCard) {
+      setPayErr("No default card selected.");
+      return;
+    }
+    // Backend needs stripeSourceId to exist on default card
+    if (!String(defaultCard.stripeSourceId || "")) {
+      setPayErr(
+        "Your default card has no stripeSourceId saved. Delete the card and add it again."
+      );
+      return;
+    }
+
     try {
       setPaying(true);
-      const data = await apiPayNow(bidIdFromRoute);
+      const data = await apiPayNow({ requestId, bidId: bidIdFromRoute });
       setPayOk(data?.message || "Payment successful");
+
+      // Backend returns receiptId on success
       if (data?.receiptId) {
         setTimeout(() => navigate(`/receipt/${data.receiptId}`), 600);
       }
@@ -623,6 +300,13 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
       setPaying(false);
     }
   }
+
+  const payDisabled =
+    paying ||
+    !bidIdFromRoute ||
+    !requestId ||
+    !defaultCard ||
+    !String(defaultCard?.stripeSourceId || "");
 
   return (
     <div
@@ -641,9 +325,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
               <span className="text-sm font-semibold">Back</span>
             </button>
 
-            <div className="text-white font-bold tracking-wide">
-              Payment Methods
-            </div>
+            <div className="text-white font-bold tracking-wide">Payment Methods</div>
 
             <div className="w-20" />
           </div>
@@ -662,76 +344,71 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
               </div>
             ) : null}
 
-            {cardsErr ? (
-              <div className="mt-4 text-red-400 text-sm">{cardsErr}</div>
-            ) : null}
+            {cardsErr ? <div className="mt-4 text-red-400 text-sm">{cardsErr}</div> : null}
 
             {!loadingCards && cards.length === 0 ? (
               <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
             ) : null}
 
             <div className="mt-4 grid gap-3">
-              {cards.map((c) => (
-                <div
-                  key={c._id}
-                  className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b0a1c]/60 p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-white/80" />
-                    </div>
-                    <div>
-                      <div className="text-white/90 text-sm font-semibold">
-                        {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
+              {cards.map((c) => {
+                const last4 = String(c?.last4 || "");
+                return (
+                  <div
+                    key={c._id}
+                    className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0b0a1c]/60 p-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                        <CreditCard className="w-5 h-5 text-white/80" />
                       </div>
-                      <div className="text-xs text-white/60">
-                        Exp{" "}
-                        {(c.exp_month ?? c.expMonth)
-                          ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
-                          : "--"}
-                        /
-                        {(c.exp_year ?? c.expYear)
-                          ? String(c.exp_year ?? c.expYear).slice(-2)
-                          : "--"}
-                        {c.isDefault ? " • Default" : ""}
+                      <div className="min-w-0">
+                        <div className="text-white/90 text-sm font-semibold truncate">
+                          {(c.brand || "CARD").toUpperCase()} •••• {last4}
+                        </div>
+                        <div className="text-xs text-white/60">
+                          Exp{" "}
+                          {c.exp_month ? String(c.exp_month).padStart(2, "0") : "--"}/
+                          {c.exp_year ? String(c.exp_year).slice(-2) : "--"}
+                          {c.isDefault ? " • Default" : ""}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    {!c.isDefault ? (
+                    <div className="flex gap-2">
+                      {!c.isDefault ? (
+                        <button
+                          onClick={() => setDefault(c)}
+                          disabled={busyKey === `default-${last4}` || !last4}
+                          className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-xs font-semibold transition disabled:opacity-50"
+                        >
+                          {busyKey === `default-${last4}` ? "..." : "Make Default"}
+                        </button>
+                      ) : (
+                        <div className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Default
+                        </div>
+                      )}
+
                       <button
-                        onClick={() => setDefault(c)}
-                        disabled={busyId === c._id}
-                        className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 text-xs font-semibold transition disabled:opacity-50"
+                        onClick={() => del(c)}
+                        disabled={busyKey === `delete-${last4}` || !last4}
+                        className="px-3 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/20 text-red-300 text-xs font-semibold transition disabled:opacity-50"
+                        title="Delete card"
                       >
-                        {busyId === c._id ? "..." : "Make Default"}
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    ) : (
-                      <div className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Default
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => del(c)}
-                      disabled={busyId === c._id}
-                      className="px-3 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/20 text-red-300 text-xs font-semibold transition disabled:opacity-50"
-                      title="Delete card"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Add Card form */}
             <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-              <div className="text-white/80 text-sm font-semibold">
-                Add a new card
-              </div>
+              <div className="text-white/80 text-sm font-semibold">Add a new card</div>
+
               <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
                 <CardElement
                   options={{
@@ -741,13 +418,14 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                         fontSize: "16px",
                         "::placeholder": { color: "rgba(255,255,255,0.5)" },
                       },
+                      invalid: { color: "#ff6b6b" },
                     },
                   }}
                 />
               </div>
 
               <button
-                onClick={addNewCard}
+                onClick={() => addNewCard(true)}
                 disabled={adding || !stripe || !elements}
                 className="mt-4 w-full md:w-auto px-4 py-2 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-600 text-black font-semibold transition disabled:opacity-50"
               >
@@ -757,37 +435,29 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
           </div>
 
           {/* Pay Now */}
-          {bidIdFromRoute && (
+          {bidIdFromRoute ? (
             <>
               <div className="rounded-2xl border border-white/20 bg-[#0b0a1c]/88 backdrop-blur-md p-6 mt-6">
                 <div className="text-white/90 font-semibold">Pay Now</div>
                 <div className="mt-2 text-xs text-white/60">
-                  You must have a default card saved to complete payment.
+                  Backend requires requestId + bidId. Provide requestId via navigation state or
+                  ?requestId=...
                 </div>
 
-                {summaryErr ? (
-                  <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
+                {!requestId ? (
+                  <div className="mt-3 text-yellow-300 text-sm">
+                    Missing requestId. Example URL: <span className="text-white/80">/payment/{bidIdFromRoute}?requestId=YOUR_REQUEST_ID</span>
+                  </div>
                 ) : null}
-                {payErr ? (
-                  <div className="mt-3 text-red-400 text-sm">{payErr}</div>
-                ) : null}
-                {payOk ? (
-                  <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
-                ) : null}
+
+                {payErr ? <div className="mt-3 text-red-400 text-sm">{payErr}</div> : null}
+                {payOk ? <div className="mt-3 text-emerald-300 text-sm">{payOk}</div> : null}
 
                 {/* Desktop button */}
                 <div className="mt-4 hidden md:block">
                   <button
                     onClick={payNow}
-                    disabled={
-                      paying ||
-                      summaryLoading ||
-                      !bid ||
-                      !request ||
-                      !defaultCard ||
-                      (!defaultCard.stripeSourceId &&
-                        !defaultCard.stripePaymentMethodId)
-                    }
+                    disabled={payDisabled}
                     className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >
                     {paying ? "Processing..." : "Pay Now"}
@@ -800,15 +470,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                 <div className="max-w-5xl mx-auto px-4 pt-3 pb-[env(safe-area-inset-bottom)]">
                   <button
                     onClick={payNow}
-                    disabled={
-                      paying ||
-                      summaryLoading ||
-                      !bid ||
-                      !request ||
-                      !defaultCard ||
-                      (!defaultCard.stripeSourceId &&
-                        !defaultCard.stripePaymentMethodId)
-                    }
+                    disabled={payDisabled}
                     className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >
                     {paying ? "Processing..." : "Pay Now"}
@@ -816,7 +478,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                 </div>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

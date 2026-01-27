@@ -156,8 +156,9 @@ export default function AcceptBid() {
     }
   };
 
+  // ✅ FIX: pass requestId via state (Option 1)
   const proceedToPayment = (bidId) => {
-    navigate(`/payment/${bidId}`);
+    navigate(`/payment/${bidId}`, { state: { requestId } });
   };
 
   const renderRating = (bid) => {

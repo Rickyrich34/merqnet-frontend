@@ -35,7 +35,14 @@ function getToken() {
 function pickDefaultAddress(user) {
   const arr = user?.shippingAddresses;
   if (!Array.isArray(arr) || arr.length === 0) return null;
-  return arr.find((a) => a?.isDefault) || arr[0] || null;
+
+  const found =
+    arr.find((a) => a?.isDefault === true) ||
+    arr.find((a) => a?.default === true) ||
+    arr.find((a) => String(a?.isDefault).toLowerCase() === "true") ||
+    arr.find((a) => String(a?.default).toLowerCase() === "true");
+
+  return found || arr[0] || null;
 }
 
 function formatShipping(addr) {

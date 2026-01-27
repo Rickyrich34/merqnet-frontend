@@ -14,13 +14,17 @@ import Galactic1 from "../assets/Galactic1.png";
 
 // Stripe
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  CardElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
 
 /* ============================
    API helpers
 ============================ */
-const API_BASE =
- import.meta.env.VITE_API_URL?.replace(/\/$/, "") 
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
 function getToken() {
   return localStorage.getItem("userToken");
@@ -82,6 +86,13 @@ async function apiGetSummary(bidId) {
   const res = await fetch(`${API_BASE}/api/payments/summary/${bidId}`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
+
+  // ✅ FIX: If backend doesn't have this route yet, don't break the page.
+  // We keep the same endpoint and same fields—just avoid hard failing on 404.
+  if (res.status === 404) {
+    return { bid: null, request: null, message: "summary route not found" };
+  }
+
   const data = await res.json();
   if (!res.ok) throw new Error(data?.message || "Failed to load summary");
   return data;
@@ -116,12 +127,20 @@ export default function PaymentMethods() {
 
   // Show non-stripe version if key missing
   if (!stripePromise) {
-    return <PaymentMethodsNoStripe bidIdFromRoute={bidIdFromRoute} navigate={navigate} />;
+    return (
+      <PaymentMethodsNoStripe
+        bidIdFromRoute={bidIdFromRoute}
+        navigate={navigate}
+      />
+    );
   }
 
   return (
     <Elements stripe={stripePromise}>
-      <PaymentMethodsStripe bidIdFromRoute={bidIdFromRoute} navigate={navigate} />
+      <PaymentMethodsStripe
+        bidIdFromRoute={bidIdFromRoute}
+        navigate={navigate}
+      />
     </Elements>
   );
 }
@@ -181,8 +200,18 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
       try {
         setSummaryLoading(true);
         setSummaryErr("");
+
         const data = await apiGetSummary(bidIdFromRoute);
         if (!alive) return;
+
+        // If summary route doesn't exist (404), we simply keep bid/request null and don't show fatal error.
+        if (data?.message === "summary route not found") {
+          setBid(null);
+          setRequest(null);
+          setSummaryErr(""); // ✅ do not scare the user with backend route mismatch
+          return;
+        }
+
         setBid(data?.bid || null);
         setRequest(data?.request || null);
       } catch (e) {
@@ -288,9 +317,7 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
             ) : null}
 
             {!loadingCards && cards.length === 0 ? (
-              <div className="mt-4 text-white/60 text-sm">
-                No cards saved.
-              </div>
+              <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
             ) : null}
 
             <div className="mt-4 grid gap-3">
@@ -308,7 +335,14 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                         {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
                       </div>
                       <div className="text-xs text-white/60">
-                        Exp {(c.exp_month ?? c.expMonth) ? String(c.exp_month ?? c.expMonth).padStart(2, "0") : "--"}/{(c.exp_year ?? c.expYear) ? String(c.exp_year ?? c.expYear).slice(-2) : "--"}
+                        Exp{" "}
+                        {(c.exp_month ?? c.expMonth)
+                          ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
+                          : "--"}
+                        /
+                        {(c.exp_year ?? c.expYear)
+                          ? String(c.exp_year ?? c.expYear).slice(-2)
+                          : "--"}
                         {c.isDefault ? " • Default" : ""}
                       </div>
                     </div>
@@ -345,9 +379,12 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
 
             {/* Add Card note */}
             <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-              <div className="text-white/80 text-sm font-semibold">Add a new card</div>
+              <div className="text-white/80 text-sm font-semibold">
+                Add a new card
+              </div>
               <div className="mt-2 text-xs text-white/60">
-                Stripe is not available (missing publishable key). Add cards from a Stripe-enabled build.
+                Stripe is not available (missing publishable key). Add cards from
+                a Stripe-enabled build.
               </div>
             </div>
           </div>
@@ -361,9 +398,15 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                   You must have a default card saved to complete payment.
                 </div>
 
-                {summaryErr ? <div className="mt-3 text-red-400 text-sm">{summaryErr}</div> : null}
-                {payErr ? <div className="mt-3 text-red-400 text-sm">{payErr}</div> : null}
-                {payOk ? <div className="mt-3 text-emerald-300 text-sm">{payOk}</div> : null}
+                {summaryErr ? (
+                  <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
+                ) : null}
+                {payErr ? (
+                  <div className="mt-3 text-red-400 text-sm">{payErr}</div>
+                ) : null}
+                {payOk ? (
+                  <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
+                ) : null}
 
                 {/* Desktop button */}
                 <div className="mt-4 hidden md:block">
@@ -375,7 +418,8 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                       !bid ||
                       !request ||
                       !defaultCard ||
-                      (!defaultCard.stripeSourceId && !defaultCard.stripePaymentMethodId)
+                      (!defaultCard.stripeSourceId &&
+                        !defaultCard.stripePaymentMethodId)
                     }
                     className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >
@@ -395,7 +439,8 @@ function PaymentMethodsNoStripe({ bidIdFromRoute, navigate }) {
                       !bid ||
                       !request ||
                       !defaultCard ||
-                      (!defaultCard.stripeSourceId && !defaultCard.stripePaymentMethodId)
+                      (!defaultCard.stripeSourceId &&
+                        !defaultCard.stripePaymentMethodId)
                     }
                     className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >
@@ -471,8 +516,18 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
       try {
         setSummaryLoading(true);
         setSummaryErr("");
+
         const data = await apiGetSummary(bidIdFromRoute);
         if (!alive) return;
+
+        // If summary route doesn't exist (404), we simply keep bid/request null and don't show fatal error.
+        if (data?.message === "summary route not found") {
+          setBid(null);
+          setRequest(null);
+          setSummaryErr(""); // ✅ do not scare the user with backend route mismatch
+          return;
+        }
+
         setBid(data?.bid || null);
         setRequest(data?.request || null);
       } catch (e) {
@@ -507,7 +562,8 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
         card: cardElement,
       });
 
-      if (error) throw new Error(error.message || "Failed to create payment method");
+      if (error)
+        throw new Error(error.message || "Failed to create payment method");
       if (!paymentMethod?.id) throw new Error("Missing paymentMethod id");
 
       await apiAddCard(paymentMethod.id);
@@ -611,9 +667,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
             ) : null}
 
             {!loadingCards && cards.length === 0 ? (
-              <div className="mt-4 text-white/60 text-sm">
-                No cards saved.
-              </div>
+              <div className="mt-4 text-white/60 text-sm">No cards saved.</div>
             ) : null}
 
             <div className="mt-4 grid gap-3">
@@ -631,7 +685,14 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                         {(c.brand || "CARD").toUpperCase()} •••• {c.last4}
                       </div>
                       <div className="text-xs text-white/60">
-                        Exp {(c.exp_month ?? c.expMonth) ? String(c.exp_month ?? c.expMonth).padStart(2, "0") : "--"}/{(c.exp_year ?? c.expYear) ? String(c.exp_year ?? c.expYear).slice(-2) : "--"}
+                        Exp{" "}
+                        {(c.exp_month ?? c.expMonth)
+                          ? String(c.exp_month ?? c.expMonth).padStart(2, "0")
+                          : "--"}
+                        /
+                        {(c.exp_year ?? c.expYear)
+                          ? String(c.exp_year ?? c.expYear).slice(-2)
+                          : "--"}
                         {c.isDefault ? " • Default" : ""}
                       </div>
                     </div>
@@ -668,7 +729,9 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
 
             {/* Add Card form */}
             <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
-              <div className="text-white/80 text-sm font-semibold">Add a new card</div>
+              <div className="text-white/80 text-sm font-semibold">
+                Add a new card
+              </div>
               <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
                 <CardElement
                   options={{
@@ -702,9 +765,15 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                   You must have a default card saved to complete payment.
                 </div>
 
-                {summaryErr ? <div className="mt-3 text-red-400 text-sm">{summaryErr}</div> : null}
-                {payErr ? <div className="mt-3 text-red-400 text-sm">{payErr}</div> : null}
-                {payOk ? <div className="mt-3 text-emerald-300 text-sm">{payOk}</div> : null}
+                {summaryErr ? (
+                  <div className="mt-3 text-red-400 text-sm">{summaryErr}</div>
+                ) : null}
+                {payErr ? (
+                  <div className="mt-3 text-red-400 text-sm">{payErr}</div>
+                ) : null}
+                {payOk ? (
+                  <div className="mt-3 text-emerald-300 text-sm">{payOk}</div>
+                ) : null}
 
                 {/* Desktop button */}
                 <div className="mt-4 hidden md:block">
@@ -716,7 +785,8 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                       !bid ||
                       !request ||
                       !defaultCard ||
-                      (!defaultCard.stripeSourceId && !defaultCard.stripePaymentMethodId)
+                      (!defaultCard.stripeSourceId &&
+                        !defaultCard.stripePaymentMethodId)
                     }
                     className="w-full md:w-auto px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >
@@ -736,7 +806,8 @@ function PaymentMethodsStripe({ bidIdFromRoute, navigate }) {
                       !bid ||
                       !request ||
                       !defaultCard ||
-                      (!defaultCard.stripeSourceId && !defaultCard.stripePaymentMethodId)
+                      (!defaultCard.stripeSourceId &&
+                        !defaultCard.stripePaymentMethodId)
                     }
                     className="w-full h-12 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition disabled:opacity-50"
                   >

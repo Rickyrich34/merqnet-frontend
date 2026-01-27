@@ -30,12 +30,6 @@ function getToken() {
   return localStorage.getItem("token") || localStorage.getItem("userToken") || "";
 }
 
-function extractUser(profileResponse) {
-  if (!profileResponse) return null;
-  if (profileResponse.user) return profileResponse.user;
-  return profileResponse;
-}
-
 function pickDefaultAddress(user) {
   const arr = user?.shippingAddresses;
   if (!Array.isArray(arr) || arr.length === 0) return null;
@@ -108,9 +102,11 @@ export default function CreateRequest() {
     const loadProfile = async () => {
       try {
         setProfileLoading(true);
-        const profileRes = await fetchUserProfile(userId, token);
-        const user = extractUser(profileRes);
-        const addr = pickDefaultAddress(user);
+        const userProfile = await fetchUserProfile(userId, token);
+
+        console.log("USER PROFILE:", userProfile);
+
+        const addr = pickDefaultAddress(userProfile);
         setDefaultAddr(addr || null);
       } finally {
         setProfileLoading(false);
@@ -178,7 +174,7 @@ export default function CreateRequest() {
 
       <div className="max-w-xl mx-auto bg-[#0B001F]/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-10 relative">
         <button
-          onClick={() => navigate("/buyerdashboard")}
+          onClick={() => navigate("/buyer-dashboard")}
           className="absolute -top-12 left-1 p-2"
         >
           <ChevronLeft className="w-5 h-5" />

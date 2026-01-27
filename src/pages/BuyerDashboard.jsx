@@ -72,8 +72,7 @@ function getQuantity(req) {
 }
 
 /**
- * BuyerDashboard MUST NOT show completed/paid/closed/expired requests.
- * Works across multiple naming conventions.
+ * BuyerDashboard MUST NOT show completed/paid/closed/expired/awarded requests.
  */
 function isExpiredRequest(r) {
   const status = String(r?.status || r?.requestStatus || "").toLowerCase();
@@ -87,6 +86,7 @@ function isExpiredRequest(r) {
     hasReceipt ||
     paymentStatus === "paid" ||
     status.includes("paid") ||
+    status.includes("awarded") || // ← ÚNICO CAMBIO
     status.includes("closed") ||
     status.includes("completed") ||
     status.includes("expired") ||
@@ -307,7 +307,6 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
-        {/* Prod API warning (only if missing) */}
         {!import.meta.env.DEV && !API_BASE_URL && (
           <div className="mt-5 rounded-2xl border border-yellow-400/25 bg-yellow-400/10 p-4 text-sm text-yellow-100">
             Missing <span className="font-bold">VITE_API_URL</span> in production. Offers won’t load until it’s set in Railway variables.
@@ -359,7 +358,7 @@ export default function BuyerDashboard() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-3xl border border-white/10 bg-[#0B001F]/55 p-7 text-center text-white/70">
-              No active requests right now. Paid/closed/expired requests won’t show here.
+              No active requests right now. Paid/closed/expired/awarded requests won’t show here.
             </div>
           ) : (
             filtered.map((r) => {
@@ -381,11 +380,9 @@ export default function BuyerDashboard() {
               return (
                 <div
                   key={rid}
-                  className="rounded-3xl border border-white/10 bg-[#0B001F]/60 p-4 sm:p-5
-                             shadow-[0_0_30px_rgba(170,90,255,0.08)]"
+                  className="rounded-3xl border border-white/10 bg-[#0B001F]/60 p-4 sm:p-5 shadow-[0_0_30px_rgba(170,90,255,0.08)]"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    {/* Left */}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <div className="text-base sm:text-lg font-extrabold truncate">
@@ -406,7 +403,6 @@ export default function BuyerDashboard() {
                       </div>
                     </div>
 
-                    {/* Right */}
                     <div className="flex flex-col sm:items-end gap-3">
                       <div className="flex items-center gap-3">
                         <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
@@ -450,7 +446,6 @@ export default function BuyerDashboard() {
                     </div>
                   </div>
 
-                  {/* Tiny helper line */}
                   <div className="mt-3 text-[11px] text-white/35">
                     Offers load from your bids endpoint. If it stays 0, your backend route name might differ — this UI now tries multiple common routes.
                   </div>

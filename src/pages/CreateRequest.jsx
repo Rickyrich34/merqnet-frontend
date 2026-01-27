@@ -96,9 +96,15 @@ export default function CreateRequest() {
   useEffect(() => {
     const loadProfile = async () => {
       setProfileLoading(true);
+
       const profile = await fetchUserProfile(userId, token);
-      const addr = pickDefaultAddress(profile);
+
+      // 🔥 FIX REAL: soportar { user: {...} } o {...}
+      const userObj = profile?.user || profile;
+
+      const addr = pickDefaultAddress(userObj);
       setDefaultAddr(addr || null);
+
       setProfileLoading(false);
     };
 
@@ -151,7 +157,7 @@ export default function CreateRequest() {
       body: JSON.stringify(payload),
     });
 
-    if (res.ok) navigate("/buyer-dashboard");
+    if (res.ok) navigate("/dashboard"); // ✅ SIN GUION
     else alert("Error creating request");
   };
 
@@ -163,7 +169,7 @@ export default function CreateRequest() {
 
       <div className="max-w-xl mx-auto bg-[#0B001F]/90 border border-cyan-500/30 rounded-3xl p-8 relative">
         <button
-          onClick={() => navigate("/buyer-dashboard")}
+          onClick={() => navigate("/dashboard")}  // ✅ SIN GUION
           className="absolute -top-12 left-1 p-2 text-white"
         >
           <ChevronLeft />

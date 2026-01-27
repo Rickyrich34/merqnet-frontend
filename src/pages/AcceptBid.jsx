@@ -2,7 +2,23 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
-const API = import.meta.env.VITE_API_URL;
+// ✅ Robust API base:
+// - In localhost dev, default to http://localhost:5000 if VITE_API_URL is missing
+// - In production, VITE_API_URL should be set (Railway). If missing, it will still try same-origin.
+function getApiBase() {
+  const envBase = (import.meta.env.VITE_API_URL || "").trim();
+  if (envBase) return envBase.replace(/\/+$/, "");
+
+  // fallback only for local dev
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "http://localhost:5000";
+  }
+
+  // last resort: same-origin (may be wrong if backend is separate)
+  return "";
+}
+
+const API = getApiBase();
 
 function getToken() {
   return localStorage.getItem("userToken") || localStorage.getItem("token") || "";
@@ -21,12 +37,54 @@ function safeNumber(n) {
   return Number.isFinite(x) ? x : 0;
 }
 
+// ✅ Safe JSON fetch that won't crash on HTML responses
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, options);
+
+  const contentType = (res.headers.get("content-type") || "").toLowerCase();
+
+  // If not OK, try to read JSON or text for a useful error
+  if (!res.ok) {
+    let body = null;
+
+    if (contentType.includes("application/json")) {
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+    } else {
+      try {
+        const text = await res.text();
+        body = { message: text?.slice(0, 300) || "Non-JSON error response" };
+      } catch {
+        body = { message: "Non-JSON error response" };
+      }
+    }
+
+    const msg = body?.message || `Request failed (${res.status})`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+
+  // If OK but still not JSON, return empty
+  if (!contentType.includes("application/json")) {
+    // This prevents "Unexpected token <"
+    return [];
+  }
+
+  return res.json();
+}
+
 export default function AcceptBid() {
   const { requestId } = useParams();
   const navigate = useNavigate();
 
   const [bids, setBids] = useState([]);
   const [acceptingBidId, setAcceptingBidId] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -34,15 +92,33 @@ export default function AcceptBid() {
   }, [requestId]);
 
   const loadAll = async () => {
+    if (!requestId) return;
+
+    // If API base is empty in production, this will likely fail; log it clearly
+    if (!API) {
+      console.error(
+        "VITE_API_URL is missing. Set it in .env for local dev and Railway Variables for production."
+      );
+    }
+
+    setLoading(true);
     try {
-      const res = await fetch(`${API}/api/bids/request/${requestId}`, {
-        headers: authHeaders(),
-      });
-      const data = await res.json();
+      const url = `${API}/api/bids/request/${requestId}`;
+      const data = await fetchJson(url, { headers: authHeaders() });
       setBids(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(err);
+      console.error("LOAD BIDS FAILED:", err?.status, err?.message, err?.body);
+
+      // If unauthorized, this is the exact issue you saw in browser
+      if (err?.status === 401 || err?.status === 403) {
+        // keep UI calm; just show empty and log
+        setBids([]);
+        return;
+      }
+
       setBids([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,34 +129,28 @@ export default function AcceptBid() {
     );
   }, [bids]);
 
-  // ✅ FIX: show real backend error
   const acceptBid = async (bidId) => {
     if (!bidId) return;
+
+    if (!API) {
+      alert("API base missing. Set VITE_API_URL and reload.");
+      return;
+    }
 
     try {
       setAcceptingBidId(bidId);
 
-      const res = await fetch(`${API}/api/bids/${bidId}/accept`, {
+      const url = `${API}/api/bids/${bidId}/accept`;
+      await fetchJson(url, {
         method: "PUT",
         headers: authHeaders(),
       });
 
-      let data = {};
-      try {
-        data = await res.json();
-      } catch {}
-
-      if (!res.ok) {
-        console.error("ACCEPT BID FAILED:", res.status, data);
-        alert(data?.message || `Could not accept bid (${res.status})`);
-        return;
-      }
-
       await loadAll();
       alert("Bid accepted!");
     } catch (err) {
-      console.error("ACCEPT BID ERROR:", err);
-      alert("Could not accept bid (network error).");
+      console.error("ACCEPT BID FAILED:", err?.status, err?.message, err?.body);
+      alert(err?.message || "Could not accept bid (network/server error).");
     } finally {
       setAcceptingBidId("");
     }
@@ -124,6 +194,10 @@ export default function AcceptBid() {
         <p className="text-sm text-white/70 mt-1">
           Choose one offer to accept, then proceed to payment.
         </p>
+
+        {loading && (
+          <div className="mt-3 text-xs text-white/50">Loading offers…</div>
+        )}
       </div>
 
       <div className="mt-10 max-w-5xl mx-auto">
@@ -206,7 +280,7 @@ export default function AcceptBid() {
                 );
               })}
 
-              {sortedBids.length === 0 && (
+              {sortedBids.length === 0 && !loading && (
                 <tr>
                   <td colSpan="6" className="p-6 text-center text-white/50">
                     No bids yet.

@@ -3,7 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import logopic2 from "../assets/logopic2.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// ✅ Match MainDashboard env behavior (and allow fallback)
+const API =
+  (import.meta?.env?.VITE_API_URL ||
+    import.meta?.env?.VITE_API_BASE_URL ||
+    "").replace(/\/$/, "");
+
+console.log("API BASE (CreateRequest) =", API);
 
 const CATEGORY_OPTIONS = [
   { value: "", label: "Select a category..." },
@@ -20,7 +26,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 function getToken() {
-  return localStorage.getItem("token") || localStorage.getItem("userToken") || "";
+  return localStorage.getItem("userToken") || localStorage.getItem("token") || "";
 }
 
 function normalizeId(x) {
@@ -35,9 +41,9 @@ function pickDefaultAddress(user) {
   if (!Array.isArray(arr) || arr.length === 0) return null;
 
   return (
-    arr.find(a => a?.isDefault === true) ||
-    arr.find(a => a?.default === true) ||
-    arr.find(a => a?.primary === true) ||
+    arr.find((a) => a?.isDefault === true) ||
+    arr.find((a) => a?.default === true) ||
+    arr.find((a) => a?.primary === true) ||
     arr[0]
   );
 }
@@ -56,9 +62,14 @@ function formatShipping(addr) {
 }
 
 async function fetchUserProfile(userId, token) {
+  if (!API) {
+    console.error("❌ API base is empty. Check Railway env vars (VITE_API_URL).");
+    return null;
+  }
+
   const urls = [
-    `${API_BASE_URL}/api/users/profile/${userId}`,
-    `${API_BASE_URL}/api/user/profile/${userId}`,
+    `${API}/api/users/profile/${userId}`,
+    `${API}/api/user/profile/${userId}`,
   ];
 
   for (const url of urls) {
@@ -66,9 +77,19 @@ async function fetchUserProfile(userId, token) {
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) return await res.json();
-    } catch {}
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error("❌ Profile fetch failed:", res.status, url, txt);
+        continue;
+      }
+
+      return await res.json();
+    } catch (err) {
+      console.error("❌ Profile fetch error:", url, err);
+    }
   }
+
   return null;
 }
 
@@ -99,7 +120,7 @@ export default function CreateRequest() {
 
       const profile = await fetchUserProfile(userId, token);
 
-      // 🔥 FIX REAL: soportar { user: {...} } o {...}
+      // supports { user: {...} } or {...}
       const userObj = profile?.user || profile;
 
       const addr = pickDefaultAddress(userObj);
@@ -111,10 +132,7 @@ export default function CreateRequest() {
     if (userId && token) loadProfile();
   }, [userId, token]);
 
-  const defaultShipText = useMemo(
-    () => formatShipping(defaultAddr),
-    [defaultAddr]
-  );
+  const defaultShipText = useMemo(() => formatShipping(defaultAddr), [defaultAddr]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -123,6 +141,11 @@ export default function CreateRequest() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!API) {
+      alert("API base URL missing. Set VITE_API_URL in Railway for the frontend.");
+      return;
+    }
 
     if (!defaultAddr) {
       alert("No default shipping address found. Please add one in Settings.");
@@ -148,17 +171,29 @@ export default function CreateRequest() {
       clientID: userId,
     };
 
-    const res = await fetch(`${API_BASE_URL}/api/requests`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch(`${API}/api/requests`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) navigate("/dashboard"); // ✅ SIN GUION
-    else alert("Error creating request");
+      if (res.ok) {
+        // ✅ keep your no-hyphen route
+        navigate("/dashboard");
+        return;
+      }
+
+      const txt = await res.text().catch(() => "");
+      console.error("❌ Create request failed:", res.status, txt);
+      alert(`Error creating request (${res.status})`);
+    } catch (err) {
+      console.error("❌ Create request network error:", err);
+      alert("Network error creating request");
+    }
   };
 
   return (
@@ -169,7 +204,7 @@ export default function CreateRequest() {
 
       <div className="max-w-xl mx-auto bg-[#0B001F]/90 border border-cyan-500/30 rounded-3xl p-8 relative">
         <button
-          onClick={() => navigate("/dashboard")}  // ✅ SIN GUION
+          onClick={() => navigate("/dashboard")}
           className="absolute -top-12 left-1 p-2 text-white"
         >
           <ChevronLeft />
@@ -180,31 +215,74 @@ export default function CreateRequest() {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <input name="productName" placeholder="Product Name" value={form.productName} onChange={handleChange} required />
-          <select name="category" value={form.category} onChange={handleChange} required>
-            {CATEGORY_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+          <input
+            className="w-full rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="productName"
+            placeholder="Product Name"
+            value={form.productName}
+            onChange={handleChange}
+            required
+          />
+
+          <select
+            className="w-full rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+            required
+          >
+            {CATEGORY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value} className="text-black">
+                {o.label}
+              </option>
             ))}
           </select>
-          <input name="quantity" type="number" value={form.quantity} onChange={handleChange} required />
-          <select name="condition" value={form.condition} onChange={handleChange}>
-            <option>New</option>
-            <option>Used</option>
-          </select>
-          <input name="sizeWeight" value={form.sizeWeight} onChange={handleChange} placeholder="Size / Weight" />
-          <textarea name="description" value={form.description} onChange={handleChange} />
 
-          <div className="border p-3 rounded text-sm">
-            {profileLoading ? (
-              "Loading address..."
-            ) : defaultShipText ? (
-              <>Default shipping address: {defaultShipText}</>
-            ) : (
-              <>No default shipping address found.</>
-            )}
+          <input
+            className="w-full rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="quantity"
+            type="number"
+            placeholder="Quantity"
+            value={form.quantity}
+            onChange={handleChange}
+            required
+          />
+
+          <select
+            className="w-full rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="condition"
+            value={form.condition}
+            onChange={handleChange}
+          >
+            <option className="text-black">New</option>
+            <option className="text-black">Used</option>
+          </select>
+
+          <input
+            className="w-full rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="sizeWeight"
+            value={form.sizeWeight}
+            onChange={handleChange}
+            placeholder="Size / Weight"
+          />
+
+          <textarea
+            className="w-full min-h-[110px] rounded-xl bg-white/10 border border-white/15 px-4 py-3 outline-none focus:border-cyan-400"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="Description"
+          />
+
+          <div className="border border-white/15 bg-white/5 p-3 rounded-xl text-sm">
+            {profileLoading
+              ? "Loading address..."
+              : defaultShipText
+              ? `Default shipping address: ${defaultShipText}`
+              : "No default shipping address found."}
           </div>
 
-          <button className="w-full bg-cyan-500 py-3 rounded-xl">
+          <button className="w-full bg-cyan-500 hover:bg-cyan-400 transition py-3 rounded-xl font-semibold">
             Create Request
           </button>
         </form>

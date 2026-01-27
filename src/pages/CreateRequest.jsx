@@ -163,7 +163,7 @@ export default function CreateRequest() {
 
       <div className="max-w-xl mx-auto bg-[#0B001F]/90 border border-cyan-500/30 rounded-3xl p-8 relative">
         <button
-          onClick={() => navigate("/buyerdashboard")}
+          onClick={() => navigate("/buyer-dashboard")}
           className="absolute -top-12 left-1 p-2 text-white"
         >
           <ChevronLeft />

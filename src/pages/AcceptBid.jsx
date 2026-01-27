@@ -157,6 +157,8 @@ export default function AcceptBid() {
   };
 
   // ✅ FIX: pass requestId via state (Option 1)
+  console.log("NAVIGATING WITH requestId =", requestId);
+
   const proceedToPayment = (bidId) => {
     navigate(`/payment/${bidId}`, { state: { requestId } });
   };

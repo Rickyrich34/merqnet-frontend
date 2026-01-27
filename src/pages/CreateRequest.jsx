@@ -30,6 +30,12 @@ function getToken() {
   return localStorage.getItem("token") || localStorage.getItem("userToken") || "";
 }
 
+function extractUser(profileResponse) {
+  if (!profileResponse) return null;
+  if (profileResponse.user) return profileResponse.user;
+  return profileResponse;
+}
+
 function pickDefaultAddress(user) {
   const arr = user?.shippingAddresses;
   if (!Array.isArray(arr) || arr.length === 0) return null;
@@ -102,8 +108,9 @@ export default function CreateRequest() {
     const loadProfile = async () => {
       try {
         setProfileLoading(true);
-        const userProfile = await fetchUserProfile(userId, token);
-        const addr = pickDefaultAddress(userProfile);
+        const profileRes = await fetchUserProfile(userId, token);
+        const user = extractUser(profileRes);
+        const addr = pickDefaultAddress(user);
         setDefaultAddr(addr || null);
       } finally {
         setProfileLoading(false);

@@ -20,7 +20,7 @@ import { Elements, CardElement, useElements, useStripe } from "@stripe/react-str
    API helpers
 ============================ */
 const API_BASE =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+ import.meta.env.VITE_API_URL?.replace(/\/$/, "") 
 
 function getToken() {
   return localStorage.getItem("userToken");

@@ -1,5 +1,3 @@
-console.log("STRIPE ENV =", import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, CreditCard, Trash2, CheckCircle2, Loader2 } from "lucide-react";
@@ -13,17 +11,41 @@ import { Elements, CardElement, useElements, useStripe } from "@stripe/react-str
 /* ============================
    API helpers (MUST match backend)
 ============================ */
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
+function getApiBase() {
+  const envBase = (import.meta.env.VITE_API_URL || "").trim();
+  if (envBase) return envBase.replace(/\/+$/, "");
+
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "http://localhost:5000";
+  }
+  return "";
+}
+
+const API_BASE = getApiBase();
 
 function getToken() {
-  return localStorage.getItem("userToken");
+  // Support both keys (some pages store "token", others store "userToken")
+  return (
+    localStorage.getItem("token") ||
+    localStorage.getItem("userToken") ||
+    ""
+  );
+}
+
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 async function apiGetCards() {
   const res = await fetch(`${API_BASE}/api/payments/cards`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  const data = await res.json();
+  const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to load cards");
   return data?.cards || [];
 }
@@ -38,29 +60,35 @@ async function apiAddCardToken(tokenId, makeDefault) {
     },
     body: JSON.stringify({ tokenId, makeDefault: !!makeDefault }),
   });
-  const data = await res.json();
+  const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to add card");
   return data;
 }
 
 // Backend route: PATCH /cards/:cardId/default, controller treats :cardId as last4
 async function apiSetDefaultByLast4(last4) {
-  const res = await fetch(`${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}/default`, {
-    method: "PATCH",
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  const data = await res.json();
+  const res = await fetch(
+    `${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}/default`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    }
+  );
+  const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to set default");
   return data;
 }
 
 // Backend route: DELETE /cards/:cardId, controller treats :cardId as last4
 async function apiDeleteByLast4(last4) {
-  const res = await fetch(`${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  const data = await res.json();
+  const res = await fetch(
+    `${API_BASE}/api/payments/cards/${encodeURIComponent(last4)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    }
+  );
+  const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Failed to delete card");
   return data;
 }
@@ -75,7 +103,7 @@ async function apiPayNow({ requestId, bidId }) {
     },
     body: JSON.stringify({ requestId, bidId }),
   });
-  const data = await res.json();
+  const data = await safeJson(res);
   if (!res.ok) throw new Error(data?.message || "Payment failed");
   return data;
 }
@@ -88,24 +116,65 @@ export default function PaymentMethods() {
   const { bidId: bidIdFromRoute } = useParams();
   const location = useLocation();
 
-  // requestId must come from navigation state OR querystring (no inventing)
-  const requestIdFromState = location?.state?.requestId || null;
-  const requestIdFromQuery = useMemo(() => {
-    try {
-      const sp = new URLSearchParams(location.search || "");
-      return sp.get("requestId");
-    } catch {
-      return null;
-    }
-  }, [location.search]);
-
-  const requestId = requestIdFromState || requestIdFromQuery || null;
-
   const stripePk = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
   const stripePromise = useMemo(() => {
     if (!stripePk) return null;
     return loadStripe(stripePk);
   }, [stripePk]);
+
+  // requestId can come from:
+  // 1) navigation state
+  // 2) query string
+  // 3) sessionStorage fallback (for refresh / alternate navigation)
+  const requestIdFromState = location?.state?.requestId || null;
+
+  const requestIdFromQuery = useMemo(() => {
+    try {
+      const sp = new URLSearchParams(location.search || "");
+      return (
+        sp.get("requestId") ||
+        sp.get("requestid") ||
+        sp.get("rid") ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }, [location.search]);
+
+  const sessionKey = useMemo(() => {
+    const bid = String(bidIdFromRoute || "").trim();
+    return bid ? `merqnet_pay_requestId_${bid}` : "";
+  }, [bidIdFromRoute]);
+
+  const [resolvedRequestId, setResolvedRequestId] = useState(
+    requestIdFromState || requestIdFromQuery || null
+  );
+
+  // Resolve requestId once bidId exists; allow refresh to recover it
+  useEffect(() => {
+    const direct = requestIdFromState || requestIdFromQuery || null;
+
+    if (direct) {
+      setResolvedRequestId(direct);
+      if (sessionKey) sessionStorage.setItem(sessionKey, direct);
+      return;
+    }
+
+    if (!direct && sessionKey) {
+      const cached = sessionStorage.getItem(sessionKey);
+      if (cached) {
+        setResolvedRequestId(cached);
+      }
+    }
+  }, [requestIdFromState, requestIdFromQuery, sessionKey]);
+
+  // Also store whenever we already have it (extra safety)
+  useEffect(() => {
+    if (sessionKey && resolvedRequestId) {
+      sessionStorage.setItem(sessionKey, resolvedRequestId);
+    }
+  }, [sessionKey, resolvedRequestId]);
 
   if (!stripePromise) {
     return (
@@ -138,7 +207,11 @@ export default function PaymentMethods() {
 
   return (
     <Elements stripe={stripePromise}>
-      <PaymentMethodsStripe bidIdFromRoute={bidIdFromRoute} requestId={requestId} />
+      <PaymentMethodsStripe
+        bidIdFromRoute={bidIdFromRoute}
+        requestId={resolvedRequestId}
+        onBack={() => navigate(-1)}
+      />
     </Elements>
   );
 }
@@ -146,7 +219,7 @@ export default function PaymentMethods() {
 /* ============================
    Stripe-enabled component
 ============================ */
-function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
+function PaymentMethodsStripe({ bidIdFromRoute, requestId, onBack }) {
   const navigate = useNavigate();
   const stripe = useStripe();
   const elements = useElements();
@@ -155,7 +228,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
   const [loadingCards, setLoadingCards] = useState(true);
   const [cardsErr, setCardsErr] = useState("");
 
-  const [busyKey, setBusyKey] = useState(""); // use last4 or action key
+  const [busyKey, setBusyKey] = useState("");
   const [adding, setAdding] = useState(false);
 
   const [paying, setPaying] = useState(false);
@@ -201,7 +274,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
     try {
       setAdding(true);
 
-      // ✅ MUST match backend: tokenId
+      // MUST match backend: tokenId
       const { token, error } = await stripe.createToken(cardElement);
       if (error) throw new Error(error.message || "Failed to tokenize card");
       if (!token?.id) throw new Error("Missing Stripe token id");
@@ -270,14 +343,15 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
       return;
     }
     if (!requestId) {
-      setPayErr("Missing requestId. Navigate here with state.requestId or ?requestId=...");
+      setPayErr(
+        "Missing requestId. Go back to offers and click Proceed to Payment again."
+      );
       return;
     }
     if (!defaultCard) {
       setPayErr("No default card selected.");
       return;
     }
-    // Backend needs stripeSourceId to exist on default card
     if (!String(defaultCard.stripeSourceId || "")) {
       setPayErr(
         "Your default card has no stripeSourceId saved. Delete the card and add it again."
@@ -290,7 +364,6 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
       const data = await apiPayNow({ requestId, bidId: bidIdFromRoute });
       setPayOk(data?.message || "Payment successful");
 
-      // Backend returns receiptId on success
       if (data?.receiptId) {
         setTimeout(() => navigate(`/receipt/${data.receiptId}`), 600);
       }
@@ -318,7 +391,7 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
           {/* Header */}
           <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate(-1)}
+              onClick={onBack}
               className="inline-flex items-center gap-2 text-white/80 hover:text-white transition"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -439,14 +512,11 @@ function PaymentMethodsStripe({ bidIdFromRoute, requestId }) {
             <>
               <div className="rounded-2xl border border-white/20 bg-[#0b0a1c]/88 backdrop-blur-md p-6 mt-6">
                 <div className="text-white/90 font-semibold">Pay Now</div>
-                <div className="mt-2 text-xs text-white/60">
-                  Backend requires requestId + bidId. Provide requestId via navigation state or
-                  ?requestId=...
-                </div>
 
                 {!requestId ? (
                   <div className="mt-3 text-yellow-300 text-sm">
-                    Missing requestId. Example URL: <span className="text-white/80">/payment/{bidIdFromRoute}?requestId=YOUR_REQUEST_ID</span>
+                    Missing requestId. Go back to offers and click{" "}
+                    <span className="text-white/90 font-semibold">Proceed to Payment</span>.
                   </div>
                 ) : null}
 

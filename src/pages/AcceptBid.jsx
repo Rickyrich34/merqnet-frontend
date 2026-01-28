@@ -15,7 +15,7 @@ function getApiBase() {
 const API = getApiBase();
 
 function getToken() {
-  return localStorage.getItem("userToken") || localStorage.getItem("token") || "";
+  return localStorage.getItem("token") || localStorage.getItem("userToken") || "";
 }
 
 function authHeaders() {
@@ -44,8 +44,10 @@ async function fetchJson(url, options = {}) {
     } else {
       try {
         const text = await res.text();
-        body = { message: text?.slice(0, 300) };
-      } catch {}
+        body = { message: text?.slice(0, 300) || "Non-JSON error response" };
+      } catch {
+        body = { message: "Non-JSON error response" };
+      }
     }
     const err = new Error(body?.message || `Request failed (${res.status})`);
     err.status = res.status;
@@ -79,7 +81,7 @@ export default function AcceptBid() {
       const data = await fetchJson(url, { headers: authHeaders() });
       setBids(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("LOAD BIDS FAILED:", err?.status, err?.message);
+      console.error("LOAD BIDS FAILED:", err?.status, err?.message, err?.body);
       setBids([]);
     } finally {
       setLoading(false);
@@ -92,8 +94,15 @@ export default function AcceptBid() {
     );
   }, [bids]);
 
+  const winningBidId = useMemo(() => {
+    if (sortedBids.length === 0) return "";
+    // winning is lowest price among non-accepted OR the only bid
+    return sortedBids[0]?._id || "";
+  }, [sortedBids]);
+
   const acceptBid = async (bidId) => {
     if (!bidId) return;
+
     try {
       setAcceptingBidId(bidId);
       const url = `${API}/api/bids/${bidId}/accept`;
@@ -101,10 +110,12 @@ export default function AcceptBid() {
         method: "PUT",
         headers: authHeaders(),
       });
+
       await loadAll();
       alert("Bid accepted!");
     } catch (err) {
-      alert(err?.message || "Could not accept bid.");
+      console.error("ACCEPT BID FAILED:", err?.status, err?.message, err?.body);
+      alert(err?.message || "Could not accept bid (network/server error).");
     } finally {
       setAcceptingBidId("");
     }
@@ -115,10 +126,7 @@ export default function AcceptBid() {
   };
 
   const askSeller = (sellerId) => {
-    // buyer-only flow assumed; backend should enforce
-    navigate(`/messages`, {
-      state: { requestId, sellerId },
-    });
+    navigate(`/messages`, { state: { requestId, sellerId } });
   };
 
   const renderRating = (bid) => {
@@ -135,6 +143,20 @@ export default function AcceptBid() {
     return <span className="text-white/40">—</span>;
   };
 
+  const getStatusLabel = (bid) => {
+    if (bid?.accepted) return { text: "Accepted", cls: "text-green-400 font-semibold" };
+
+    // If only one bid exists, it's winning (until buyer accepts)
+    if (sortedBids.length === 1) return { text: "Winning", cls: "text-fuchsia-300 font-semibold" };
+
+    // Else winning = lowest totalPrice
+    if (String(bid?._id) === String(winningBidId)) {
+      return { text: "Winning", cls: "text-fuchsia-300 font-semibold" };
+    }
+
+    return { text: "Pending", cls: "text-white/60" };
+  };
+
   return (
     <div className="min-h-screen bg-black text-white px-4 sm:px-6 pt-[140px] pb-24">
       <button
@@ -149,32 +171,33 @@ export default function AcceptBid() {
         <p className="text-sm text-white/70 mt-1">
           Choose one offer to accept, then proceed to payment.
         </p>
-        {loading && (
-          <div className="mt-3 text-xs text-white/50">Loading offers…</div>
-        )}
+        {loading && <div className="mt-3 text-xs text-white/50">Loading offers…</div>}
       </div>
 
       <div className="mt-10 max-w-3xl mx-auto space-y-4">
         {sortedBids.map((bid) => {
           const seller = bid?.sellerId;
-          const sellerName = seller?.email || "Unknown seller";
+          const sellerName = seller?.fullName || seller?.email || "Unknown seller";
+
+          const delivery = typeof bid?.deliveryTime === "string" && bid.deliveryTime.trim()
+            ? bid.deliveryTime.trim()
+            : "TBD";
+
+          const status = getStatusLabel(bid);
 
           return (
             <div
               key={bid._id}
               className="rounded-2xl border border-white/15 bg-[#0b0a1c]/80 backdrop-blur-md p-4 sm:p-5"
             >
-              {/* Seller */}
               <div className="text-sm text-white/60">Seller</div>
               <div className="font-medium mb-2">{sellerName}</div>
 
-              {/* Rating */}
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-white/60">Seller Rating</span>
                 {renderRating(bid)}
               </div>
 
-              {/* Offer */}
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-white/60">Seller Offer</span>
                 <span className="text-orange-300 font-semibold">
@@ -182,23 +205,16 @@ export default function AcceptBid() {
                 </span>
               </div>
 
-              {/* Delivery */}
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-white/60">Delivery</span>
-                <span>{bid.deliveryTime}</span>
+                <span>{delivery}</span>
               </div>
 
-              {/* Status */}
               <div className="flex justify-between text-sm mb-3">
                 <span className="text-white/60">Status</span>
-                {bid.accepted ? (
-                  <span className="text-green-400 font-semibold">Accepted</span>
-                ) : (
-                  <span className="text-white/60">Pending</span>
-                )}
+                <span className={status.cls}>{status.text}</span>
               </div>
 
-              {/* Actions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <button
                   onClick={() => askSeller(seller?._id)}

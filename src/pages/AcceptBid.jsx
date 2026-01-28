@@ -96,7 +96,6 @@ export default function AcceptBid() {
 
   const winningBidId = useMemo(() => {
     if (sortedBids.length === 0) return "";
-    // winning is lowest price among non-accepted OR the only bid
     return sortedBids[0]?._id || "";
   }, [sortedBids]);
 
@@ -115,14 +114,14 @@ export default function AcceptBid() {
       alert("Bid accepted!");
     } catch (err) {
       console.error("ACCEPT BID FAILED:", err?.status, err?.message, err?.body);
-      alert(err?.message || "Could not accept bid (network/server error).");
+      alert(err?.message || "Could not accept bid.");
     } finally {
       setAcceptingBidId("");
     }
   };
 
   const proceedToPayment = (bidId) => {
-    navigate(`/payment/${bidId}`, { state: { requestId } });
+    navigate(`/payment/${bidId}?requestId=${requestId}`);
   };
 
   const askSeller = (sellerId) => {
@@ -144,12 +143,12 @@ export default function AcceptBid() {
   };
 
   const getStatusLabel = (bid) => {
-    if (bid?.accepted) return { text: "Accepted", cls: "text-green-400 font-semibold" };
+    if (bid?.accepted)
+      return { text: "Accepted", cls: "text-green-400 font-semibold" };
 
-    // If only one bid exists, it's winning (until buyer accepts)
-    if (sortedBids.length === 1) return { text: "Winning", cls: "text-fuchsia-300 font-semibold" };
+    if (sortedBids.length === 1)
+      return { text: "Winning", cls: "text-fuchsia-300 font-semibold" };
 
-    // Else winning = lowest totalPrice
     if (String(bid?._id) === String(winningBidId)) {
       return { text: "Winning", cls: "text-fuchsia-300 font-semibold" };
     }
@@ -179,9 +178,10 @@ export default function AcceptBid() {
           const seller = bid?.sellerId;
           const sellerName = seller?.fullName || seller?.email || "Unknown seller";
 
-          const delivery = typeof bid?.deliveryTime === "string" && bid.deliveryTime.trim()
-            ? bid.deliveryTime.trim()
-            : "TBD";
+          const delivery =
+            typeof bid?.deliveryTime === "string" && bid.deliveryTime.trim()
+              ? bid.deliveryTime.trim()
+              : "TBD";
 
           const status = getStatusLabel(bid);
 
@@ -218,9 +218,7 @@ export default function AcceptBid() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 <button
                   onClick={() => askSeller(seller?._id)}
-                  className="w-full rounded-xl py-3 text-sm font-semibold
-                    bg-gradient-to-r from-cyan-500 to-fuchsia-600 text-white
-                    shadow-lg active:scale-[0.99] transition"
+                  className="w-full rounded-xl py-3 text-sm font-semibold bg-gradient-to-r from-cyan-500 to-fuchsia-600 text-white shadow-lg transition"
                 >
                   Ask the Seller
                 </button>
@@ -229,9 +227,7 @@ export default function AcceptBid() {
                   <button
                     disabled={acceptingBidId === bid._id}
                     onClick={() => acceptBid(bid._id)}
-                    className="w-full rounded-xl py-3 text-sm font-semibold
-                      bg-orange-500 hover:bg-orange-600 text-black
-                      disabled:opacity-50 transition"
+                    className="w-full rounded-xl py-3 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-black disabled:opacity-50 transition"
                   >
                     Accept Offer
                   </button>
@@ -240,8 +236,7 @@ export default function AcceptBid() {
                 {bid.accepted && (
                   <button
                     onClick={() => proceedToPayment(bid._id)}
-                    className="w-full rounded-xl py-3 text-sm font-semibold
-                      bg-emerald-500 hover:bg-emerald-600 text-black transition sm:col-span-2"
+                    className="w-full rounded-xl py-3 text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-black transition sm:col-span-2"
                   >
                     Proceed to Payment
                   </button>

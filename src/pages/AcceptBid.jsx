@@ -2,19 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 
-// ✅ Robust API base:
-// - In localhost dev, default to http://localhost:5000 if VITE_API_URL is missing
-// - In production, VITE_API_URL should be set (Railway). If missing, it will still try same-origin.
 function getApiBase() {
   const envBase = (import.meta.env.VITE_API_URL || "").trim();
   if (envBase) return envBase.replace(/\/+$/, "");
 
-  // fallback only for local dev
   if (typeof window !== "undefined" && window.location.hostname === "localhost") {
     return "http://localhost:5000";
   }
-
-  // last resort: same-origin (may be wrong if backend is separate)
   return "";
 }
 
@@ -37,44 +31,29 @@ function safeNumber(n) {
   return Number.isFinite(x) ? x : 0;
 }
 
-// ✅ Safe JSON fetch that won't crash on HTML responses
 async function fetchJson(url, options = {}) {
   const res = await fetch(url, options);
-
   const contentType = (res.headers.get("content-type") || "").toLowerCase();
 
-  // If not OK, try to read JSON or text for a useful error
   if (!res.ok) {
     let body = null;
-
     if (contentType.includes("application/json")) {
       try {
         body = await res.json();
-      } catch {
-        body = null;
-      }
+      } catch {}
     } else {
       try {
         const text = await res.text();
-        body = { message: text?.slice(0, 300) || "Non-JSON error response" };
-      } catch {
-        body = { message: "Non-JSON error response" };
-      }
+        body = { message: text?.slice(0, 300) };
+      } catch {}
     }
-
-    const msg = body?.message || `Request failed (${res.status})`;
-    const err = new Error(msg);
+    const err = new Error(body?.message || `Request failed (${res.status})`);
     err.status = res.status;
     err.body = body;
     throw err;
   }
 
-  // If OK but still not JSON, return empty
-  if (!contentType.includes("application/json")) {
-    // This prevents "Unexpected token <"
-    return [];
-  }
-
+  if (!contentType.includes("application/json")) return [];
   return res.json();
 }
 
@@ -94,35 +73,19 @@ export default function AcceptBid() {
   const loadAll = async () => {
     if (!requestId) return;
 
-    // If API base is empty in production, this will likely fail; log it clearly
-    if (!API) {
-      console.error(
-        "VITE_API_URL is missing. Set it in .env for local dev and Railway Variables for production."
-      );
-    }
-
     setLoading(true);
     try {
       const url = `${API}/api/bids/request/${requestId}`;
       const data = await fetchJson(url, { headers: authHeaders() });
       setBids(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("LOAD BIDS FAILED:", err?.status, err?.message, err?.body);
-
-      // If unauthorized, this is the exact issue you saw in browser
-      if (err?.status === 401 || err?.status === 403) {
-        // keep UI calm; just show empty and log
-        setBids([]);
-        return;
-      }
-
+      console.error("LOAD BIDS FAILED:", err?.status, err?.message);
       setBids([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Lowest price first
   const sortedBids = useMemo(() => {
     return [...bids].sort(
       (a, b) => safeNumber(a?.totalPrice) - safeNumber(b?.totalPrice)
@@ -131,36 +94,31 @@ export default function AcceptBid() {
 
   const acceptBid = async (bidId) => {
     if (!bidId) return;
-
-    if (!API) {
-      alert("API base missing. Set VITE_API_URL and reload.");
-      return;
-    }
-
     try {
       setAcceptingBidId(bidId);
-
       const url = `${API}/api/bids/${bidId}/accept`;
       await fetchJson(url, {
         method: "PUT",
         headers: authHeaders(),
       });
-
       await loadAll();
       alert("Bid accepted!");
     } catch (err) {
-      console.error("ACCEPT BID FAILED:", err?.status, err?.message, err?.body);
-      alert(err?.message || "Could not accept bid (network/server error).");
+      alert(err?.message || "Could not accept bid.");
     } finally {
       setAcceptingBidId("");
     }
   };
 
-  // ✅ FIX: pass requestId via state (Option 1)
-  console.log("NAVIGATING WITH requestId =", requestId);
-
   const proceedToPayment = (bidId) => {
     navigate(`/payment/${bidId}`, { state: { requestId } });
+  };
+
+  const askSeller = (sellerId) => {
+    // buyer-only flow assumed; backend should enforce
+    navigate(`/messages`, {
+      state: { requestId, sellerId },
+    });
   };
 
   const renderRating = (bid) => {
@@ -169,25 +127,19 @@ export default function AcceptBid() {
 
     if (ratingCount > 0) {
       return (
-        <>
-          <div className="text-cyan-300 font-semibold">
-            {rating.toFixed(1)} / 10
-          </div>
-          <div className="text-xs text-white/50">
-            Based on {ratingCount} rated sales
-          </div>
-        </>
+        <span className="text-cyan-300 font-semibold">
+          {rating.toFixed(1)} / 10
+        </span>
       );
     }
-
     return <span className="text-white/40">—</span>;
   };
 
   return (
-    <div className="min-h-screen bg-black text-white px-6 pt-[160px] pb-20">
+    <div className="min-h-screen bg-black text-white px-4 sm:px-6 pt-[140px] pb-24">
       <button
         onClick={() => navigate(-1)}
-        className="rounded-xl border border-white/15 bg-[#0b0a1c]/70 hover:bg-[#0b0a1c]/85 transition p-2 backdrop-blur-md text-white/80 hover:text-white"
+        className="rounded-xl border border-white/15 bg-[#0b0a1c]/70 hover:bg-[#0b0a1c]/85 transition p-2 text-white/80 hover:text-white"
       >
         <ChevronLeft size={18} />
       </button>
@@ -197,102 +149,95 @@ export default function AcceptBid() {
         <p className="text-sm text-white/70 mt-1">
           Choose one offer to accept, then proceed to payment.
         </p>
-
         {loading && (
           <div className="mt-3 text-xs text-white/50">Loading offers…</div>
         )}
       </div>
 
-      <div className="mt-10 max-w-5xl mx-auto">
-        <div className="rounded-2xl border border-white/15 bg-[#0b0a1c]/80 backdrop-blur-md overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="text-white/70 border-b border-white/10">
-              <tr>
-                <th className="p-4 text-left">Seller</th>
-                <th className="p-4">Seller Rating</th>
-                <th className="p-4">Seller Offer</th>
-                <th className="p-4">Delivery</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Action</th>
-              </tr>
-            </thead>
+      <div className="mt-10 max-w-3xl mx-auto space-y-4">
+        {sortedBids.map((bid) => {
+          const seller = bid?.sellerId;
+          const sellerName = seller?.email || "Unknown seller";
 
-            <tbody>
-              {sortedBids.map((bid) => {
-                const seller = bid?.sellerId;
-                const sellerEmail = seller?.email || "Unknown";
+          return (
+            <div
+              key={bid._id}
+              className="rounded-2xl border border-white/15 bg-[#0b0a1c]/80 backdrop-blur-md p-4 sm:p-5"
+            >
+              {/* Seller */}
+              <div className="text-sm text-white/60">Seller</div>
+              <div className="font-medium mb-2">{sellerName}</div>
 
-                return (
-                  <tr
-                    key={bid._id}
-                    className="border-t border-white/5 hover:bg-white/2 transition"
+              {/* Rating */}
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-white/60">Seller Rating</span>
+                {renderRating(bid)}
+              </div>
+
+              {/* Offer */}
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-white/60">Seller Offer</span>
+                <span className="text-orange-300 font-semibold">
+                  ${safeNumber(bid.totalPrice).toLocaleString()}
+                </span>
+              </div>
+
+              {/* Delivery */}
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-white/60">Delivery</span>
+                <span>{bid.deliveryTime}</span>
+              </div>
+
+              {/* Status */}
+              <div className="flex justify-between text-sm mb-3">
+                <span className="text-white/60">Status</span>
+                {bid.accepted ? (
+                  <span className="text-green-400 font-semibold">Accepted</span>
+                ) : (
+                  <span className="text-white/60">Pending</span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <button
+                  onClick={() => askSeller(seller?._id)}
+                  className="w-full rounded-xl py-3 text-sm font-semibold
+                    bg-gradient-to-r from-cyan-500 to-fuchsia-600 text-white
+                    shadow-lg active:scale-[0.99] transition"
+                >
+                  Ask the Seller
+                </button>
+
+                {!bid.accepted && (
+                  <button
+                    disabled={acceptingBidId === bid._id}
+                    onClick={() => acceptBid(bid._id)}
+                    className="w-full rounded-xl py-3 text-sm font-semibold
+                      bg-orange-500 hover:bg-orange-600 text-black
+                      disabled:opacity-50 transition"
                   >
-                    <td className="p-4 align-top">
-                      <div className="font-medium">{sellerEmail}</div>
-                    </td>
+                    Accept Offer
+                  </button>
+                )}
 
-                    <td className="p-4 text-center align-top">
-                      {renderRating(bid)}
-                    </td>
+                {bid.accepted && (
+                  <button
+                    onClick={() => proceedToPayment(bid._id)}
+                    className="w-full rounded-xl py-3 text-sm font-semibold
+                      bg-emerald-500 hover:bg-emerald-600 text-black transition sm:col-span-2"
+                  >
+                    Proceed to Payment
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
 
-                    <td className="p-4 text-center align-top text-orange-300 font-semibold">
-                      ${safeNumber(bid.totalPrice).toLocaleString()}
-                    </td>
-
-                    <td className="p-4 text-center align-top">
-                      {bid.deliveryTime}
-                    </td>
-
-                    <td className="p-4 text-center align-top">
-                      {bid.accepted ? (
-                        <span className="text-green-400 font-semibold">
-                          Accepted
-                        </span>
-                      ) : (
-                        <span className="text-white/60">Pending</span>
-                      )}
-                    </td>
-
-                    <td className="p-4 text-center align-top">
-                      <div className="flex flex-col gap-2 items-center">
-                        <button className="px-4 py-1 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 transition">
-                          Ask the Seller
-                        </button>
-
-                        {!bid.accepted && (
-                          <button
-                            disabled={acceptingBidId === bid._id}
-                            onClick={() => acceptBid(bid._id)}
-                            className="px-4 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-black font-semibold transition disabled:opacity-50"
-                          >
-                            Accept Bid
-                          </button>
-                        )}
-
-                        {bid.accepted && (
-                          <button
-                            onClick={() => proceedToPayment(bid._id)}
-                            className="px-4 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-semibold transition"
-                          >
-                            Proceed to Payment
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {sortedBids.length === 0 && !loading && (
-                <tr>
-                  <td colSpan="6" className="p-6 text-center text-white/50">
-                    No bids yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {!loading && sortedBids.length === 0 && (
+          <div className="text-center text-white/50 mt-6">No bids yet.</div>
+        )}
       </div>
     </div>
   );

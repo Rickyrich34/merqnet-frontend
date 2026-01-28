@@ -1,14 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, RefreshCcw } from "lucide-react";
 
-// Seller Dashboard – MerqNet
-// Mobile-first, no avatars, no duplicated global navbar
-// Shows buyer requests as cards with bidding state
-// IMPORTANT: backend routes are under /api
+/**
+ * MerqNet - SellerDashboard.jsx
+ * - Uses backend endpoint: GET /api/requests/filtered/:userId
+ * - Backend returns: { requests: [...] }
+ * - Requester display name uses populated clientID:
+ *     request.clientID.fullName (fallback to email)
+ * - No avatars/photos
+ * - No duplicated global navbar content
+ * - Cards + Make Offer -> /submitbid/:requestId
+ *
+ * NOTE:
+ * lowestOffer + myBidStatus are NOT provided by your current requestController.
+ * This file shows "No offers yet" unless those fields exist.
+ */
 
 export default function SellerDashboard() {
   const navigate = useNavigate();
+
   const [requests, setRequests] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +27,7 @@ export default function SellerDashboard() {
 
   const API_BASE = useMemo(() => {
     const base = (import.meta.env.VITE_API_URL || "").trim();
-    return base.replace(/\/+$/, ""); // remove trailing slash
+    return base.replace(/\/+$/, "");
   }, []);
 
   useEffect(() => {
@@ -30,26 +41,33 @@ export default function SellerDashboard() {
 
     try {
       const token =
-        localStorage.getItem("token") || localStorage.getItem("userToken") || "";
+        localStorage.getItem("token") ||
+        localStorage.getItem("userToken") ||
+        "";
+
+      const userId = (localStorage.getItem("userId") || "").trim();
 
       if (!API_BASE) {
-        setErrMsg("Missing VITE_API_URL.");
         setRequests([]);
+        setErrMsg("Missing VITE_API_URL.");
         return;
       }
 
-      if (!token) {
-        // not logged in
-        navigate("/login");
+      if (!token || !userId) {
+        setRequests([]);
+        setErrMsg("Missing auth (token/userId). Please login again.");
         return;
       }
 
-      // ✅ FIX: use /api prefix
-      const url = `${API_BASE}/api/requests/active`;
+      // ✅ Correct seller endpoint
+      const url = `${API_BASE}/api/requests/filtered/${userId}`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      // backend returns { requests: [...] }
+      const data = await res.json().catch(() => ({}));
 
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -59,47 +77,53 @@ export default function SellerDashboard() {
       }
 
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setErrMsg(`Requests fetch failed (${res.status}). ${txt}`.trim());
+        const msg =
+          typeof data?.message === "string"
+            ? data.message
+            : `Requests fetch failed (${res.status}).`;
         setRequests([]);
+        setErrMsg(msg);
         return;
       }
 
-      const data = await res.json();
-
-      // supports either: []  OR { requests: [] }
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.requests)
-        ? data.requests
-        : [];
-
+      const list = Array.isArray(data?.requests) ? data.requests : [];
       setRequests(list);
     } catch (err) {
       console.error("Failed loading seller requests", err);
-      setErrMsg("Failed loading seller requests.");
       setRequests([]);
+      setErrMsg("Failed loading seller requests.");
     } finally {
       setLoading(false);
     }
   }
 
-  const filtered = requests.filter((r) => {
-    const q = search.toLowerCase();
-    return (
-      String(r.productName || "").toLowerCase().includes(q) ||
-      String(r.category || "").toLowerCase().includes(q) ||
-      String(r.buyerName || r.buyerEmail || "").toLowerCase().includes(q) ||
-      String(r._id || "").toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return requests;
+
+    return (requests || []).filter((r) => {
+      const requester =
+        String(r?.clientID?.fullName || r?.clientID?.email || "").toLowerCase();
+      const productName = String(r?.productName || "").toLowerCase();
+      const category = String(r?.category || "").toLowerCase();
+      const id = String(r?._id || "").toLowerCase();
+
+      return (
+        requester.includes(q) ||
+        productName.includes(q) ||
+        category.includes(q) ||
+        id.includes(q)
+      );
+    });
+  }, [requests, search]);
 
   return (
     <div className="min-h-screen bg-black text-white px-4 pb-24 pt-6">
       <div className="max-w-5xl mx-auto">
+        {/* Header (no navbar duplication) */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-yellow-400 mb-1">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-yellow-400 mb-1">
               Seller Dashboard
             </h1>
             <p className="text-sm text-gray-400">
@@ -109,9 +133,13 @@ export default function SellerDashboard() {
 
           <button
             onClick={fetchRequests}
-            className="shrink-0 bg-[#0f0a1a] border border-purple-900/70 hover:border-purple-700 text-white/80 rounded-xl px-4 py-2 text-sm"
+            className="shrink-0 inline-flex items-center gap-2 bg-[#0f0a1a] border border-purple-900/70 hover:border-yellow-500/40 text-white/80 rounded-xl px-4 py-2 text-sm"
+            title="Refresh"
           >
-            {loading ? "Refreshing..." : "Refresh"}
+            <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">
+              {loading ? "Refreshing..." : "Refresh"}
+            </span>
           </button>
         </div>
 
@@ -121,11 +149,15 @@ export default function SellerDashboard() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by buyer, product, category, or ID..."
+            placeholder="Search by username, product, category, or ID..."
             className="bg-transparent outline-none flex-1 text-sm placeholder:text-gray-500"
           />
+          <div className="text-xs text-gray-500">
+            {loading ? "Loading..." : `${filtered.length}/${requests.length}`}
+          </div>
         </div>
 
+        {/* Error */}
         {errMsg && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {errMsg}
@@ -134,18 +166,23 @@ export default function SellerDashboard() {
 
         {/* Requests */}
         <div className="space-y-4">
-          {filtered.map((req) => (
-            <RequestCard
-              key={req._id}
-              request={req}
-              onBid={() => navigate(`/submitbid/${req._id}`)}
-            />
-          ))}
+          {!loading &&
+            filtered.map((req) => (
+              <RequestCard
+                key={req._id}
+                request={req}
+                onBid={() => navigate(`/submitbid/${req._id}`)}
+              />
+            ))}
 
           {!loading && filtered.length === 0 && (
             <div className="text-center text-gray-500 py-12">
               No active requests found.
             </div>
+          )}
+
+          {loading && (
+            <div className="text-center text-gray-500 py-12">Loading…</div>
           )}
         </div>
       </div>
@@ -154,33 +191,79 @@ export default function SellerDashboard() {
 }
 
 function RequestCard({ request, onBid }) {
-  const lowest = request.lowestOffer; // backend should provide or set null
-  const myStatus = request.myBidStatus; // "winning" | "outbid" | null
+  // unified username (from populated clientID)
+  const username =
+    request?.clientID?.fullName ||
+    request?.clientID?.email ||
+    "Unknown user";
+
+  // optional (only if backend provides it)
+  const ratingRaw =
+    request?.clientID?.rating ??
+    request?.buyerRating ??
+    request?.rating ??
+    null;
+
+  const rating =
+    ratingRaw != null && !Number.isNaN(Number(ratingRaw))
+      ? Number(ratingRaw)
+      : null;
+
+  // optional (only if backend provides it)
+  const lowest =
+    request?.lowestOffer != null && !Number.isNaN(Number(request.lowestOffer))
+      ? Number(request.lowestOffer)
+      : null;
+
+  // optional (only if backend provides it)
+  const myStatus =
+    request?.myBidStatus === "winning" || request?.myBidStatus === "outbid"
+      ? request.myBidStatus
+      : null;
+
+  // target display: prefer wholeLotPrice if present, else unitPrice, else legacy targetPrice
+  const target =
+    request?.wholeLotPrice ??
+    request?.unitPrice ??
+    request?.targetPrice ??
+    null;
 
   return (
     <div className="bg-gradient-to-br from-[#12091f] to-[#050208] border border-yellow-500/30 rounded-2xl p-4 md:p-5 shadow-xl flex flex-col md:flex-row gap-4 md:items-center justify-between">
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-1">
           <span className="font-semibold text-yellow-400 truncate">
-            {request.buyerName || request.buyerEmail || "Buyer"}
+            {username}
           </span>
-          {request.buyerRating != null && (
+
+          {rating != null && (
             <span className="text-xs text-gray-400">
-              ⭐ {request.buyerRating}/10
+              ⭐ {rating.toFixed(1)}/10
             </span>
           )}
+
+          <span className="text-[11px] text-gray-500">
+            ID: {String(request?._id || "").slice(-8)}
+          </span>
         </div>
 
-        <h3 className="text-lg font-semibold">{request.productName}</h3>
+        <h3 className="text-lg font-semibold">
+          {request?.productName || "Request"}
+        </h3>
 
         <div className="text-xs text-gray-400 mt-1">
-          Qty: {request.quantity} • {request.category}
+          Qty: {request?.quantity ?? "—"} • {request?.category || "—"}
+          {request?.condition ? ` • ${request.condition}` : ""}
+          {request?.sizeWeight ? ` • ${request.sizeWeight}` : ""}
         </div>
 
-        {request.description && (
-          <div className="text-xs text-gray-500 mt-1">{request.description}</div>
+        {request?.description && (
+          <div className="text-xs text-gray-500 mt-2 line-clamp-2">
+            {request.description}
+          </div>
         )}
 
+        {/* Offer state */}
         <div className="mt-3 text-sm">
           {!lowest && <span className="text-gray-400">No offers yet</span>}
 
@@ -191,7 +274,9 @@ function RequestCard({ request, onBid }) {
           )}
 
           {lowest && myStatus === "outbid" && (
-            <span className="text-red-400">Lowest Offer: ${lowest} • Outbid</span>
+            <span className="text-red-400">
+              Lowest Offer: ${lowest} • Outbid
+            </span>
           )}
 
           {lowest && !myStatus && (
@@ -202,7 +287,7 @@ function RequestCard({ request, onBid }) {
 
       <div className="flex flex-col items-end gap-3">
         <div className="text-yellow-400 font-bold text-xl">
-          ${request.targetPrice ?? request.unitPrice ?? "—"}
+          {target == null ? "—" : `$${Number(target).toLocaleString()}`}
         </div>
 
         <button

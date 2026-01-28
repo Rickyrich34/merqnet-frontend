@@ -1,3 +1,6 @@
+console.log("VITE_API_URL =", import.meta.env.VITE_API_URL);
+
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
